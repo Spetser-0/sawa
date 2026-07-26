@@ -4,11 +4,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { videosAPI } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import Analytics from "../components/Analytics";
+import Uploader from "../components/Uploader";
 import { useToast } from "../components/ui/Toast";
 import { VideoCardSkeleton, EmptyState, ConfirmDialog } from "../components/ui/Primitives";
 import {
   Video, Mic, BarChart3, Link2, Trash2, Check,
-  Clock, HardDrive, Film, MonitorPlay,
+  Clock, HardDrive, Film, MonitorPlay, Upload,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [copied,      setCopied]      = useState(null);
   const [analyticsId, setAnalyticsId] = useState(null);
+  const [showUploader, setShowUploader] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -88,11 +90,22 @@ export default function Dashboard() {
             {user?.plan === "free" && ` (${videos.length}/25)`}
           </p>
         </div>
-        <Link to="/record" className="btn btn-primary">
-          <Video size={16} />
-          {t("dashboard.new_recording")}
-        </Link>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn btn-outline" onClick={() => setShowUploader(!showUploader)}>
+            <Upload size={16} />
+            {t("dashboard.upload_button", "رفع ملف")}
+          </button>
+          <Link to="/record" className="btn btn-primary">
+            <Video size={16} />
+            {t("dashboard.new_recording")}
+          </Link>
+        </div>
       </div>
+
+      {/* مرفّع الملفات */}
+      {showUploader && (
+        <Uploader onSuccess={(id) => { setShowUploader(false); navigate(`/watch/${id}`); }} />
+      )}
 
       {/* تحميل — skeletons */}
       {loading && (
