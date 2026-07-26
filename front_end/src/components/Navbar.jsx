@@ -1,189 +1,187 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../hooks/useAuth";
+import {
+  Video, Settings, LogOut, Globe, Menu, X, ChevronDown,
+  LayoutGrid, Search, CreditCard,
+} from "lucide-react";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
-  const navigate         = useNavigate();
-  const location         = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);      // قائمة المستخدم
+  const [mobileOpen, setMobileOpen] = useState(false);  // قائمة الموبايل
   const menuRef = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = (path) => location.pathname === path;
+  // إغلاق قائمة الموبايل عند تغيير المسار
+  useEffect(() => { setMobileOpen(false); setMenuOpen(false); }, [location.pathname]);
 
   const toggleLanguage = () => {
-    const next = i18n.language === "ar" ? "en" : "ar";
-    i18n.changeLanguage(next);
+    i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar");
   };
 
+  const handleLogout = async () => {
+    setMenuOpen(false);
+    try { await logout(); } finally { navigate("/"); }
+  };
+
+  const NAV_LINKS = [
+    { to: "/dashboard", label: t("nav.my_recordings"), icon: <LayoutGrid size={15} /> },
+    { to: "/search",    label: t("nav.search"),        icon: <Search size={15} /> },
+    { to: "/pricing",   label: t("nav.pricing"),       icon: <CreditCard size={15} /> },
+  ];
+
   return (
-    <nav style={{
-      position: "sticky", top: 0, zIndex: 100,
-      height: 58,
-      background: scrolled ? "rgba(6,6,14,0.85)" : "transparent",
-      backdropFilter: scrolled ? "blur(20px)" : "none",
-      WebkitBackdropFilter: scrolled ? "blur(20px)" : "none",
-      borderBottom: scrolled ? "1px solid #1e1e3080" : "1px solid transparent",
-      padding: "0 24px",
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      transition: "all 0.3s ease",
-    }}>
+    <>
+      <nav className={`navbar ${scrolled || mobileOpen ? "scrolled" : ""}`}>
+        {/* شعار */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {user && (
+            <button
+              className="nav-mobile-toggle"
+              aria-label="menu"
+              onClick={() => setMobileOpen((v) => !v)}
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          )}
+          <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="gradient-text" style={{ fontSize: 22, fontWeight: 900, lineHeight: 1 }}>
+              {t("app_name")}
+            </span>
+            <span className="chip" style={{
+              color: "var(--green)", background: "rgba(52,211,153,0.08)",
+              border: "1px solid rgba(52,211,153,0.2)", letterSpacing: 1, fontSize: 10,
+            }}>BETA</span>
+          </Link>
+        </div>
 
-      {/* شعار */}
-      <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{
-          fontSize: 22, fontWeight: 900,
-          background: "linear-gradient(135deg, #34D399, #818CF8)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>{t("app_name")}</div>
-        <span style={{
-          fontSize: 10, color: "#34D399", background: "#34D39915",
-          border: "1px solid #34D39930", borderRadius: 6, padding: "1px 7px",
-          fontWeight: 700, letterSpacing: 1,
-        }}>BETA</span>
-      </Link>
+        {/* روابط سطح المكتب */}
+        {user && (
+          <div className="nav-links-desktop">
+            {NAV_LINKS.map((l) => (
+              <NavLink key={l.to} to={l.to} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+                {l.label}
+              </NavLink>
+            ))}
+          </div>
+        )}
 
-      {/* روابط وسط */}
-      {user && (
-        <div style={{ display: "flex", gap: 4 }}>
-          {[
-            { to: "/dashboard", label: t("nav.my_recordings") },
-            { to: "/search",    label: t("nav.search") },
-            { to: "/pricing",   label: t("nav.pricing") },
-          ].map(l => (
-            <Link key={l.to} to={l.to} style={{
-              textDecoration: "none", padding: "6px 14px", borderRadius: 8,
-              fontSize: 13, fontWeight: 500,
-              color: isActive(l.to) ? "#34D399" : "#888",
-              background: isActive(l.to) ? "#34D39912" : "transparent",
-              transition: "all 0.2s",
-            }}
-              onMouseEnter={(e) => { if (!isActive(l.to)) { e.currentTarget.style.color = "#ccc"; e.currentTarget.style.background = "#ffffff08"; } }}
-              onMouseLeave={(e) => { if (!isActive(l.to)) { e.currentTarget.style.color = "#888"; e.currentTarget.style.background = "transparent"; } }}
-            >{l.label}</Link>
+        {/* يمين */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={toggleLanguage}
+            className="btn btn-outline btn-sm"
+            style={{ gap: 5 }}
+            aria-label="language"
+          >
+            <Globe size={13} />
+            {i18n.language === "ar" ? "EN" : "عربي"}
+          </button>
+
+          {user ? (
+            <>
+              <Link to="/record" className="btn btn-primary btn-sm" style={{ boxShadow: "0 0 16px var(--green-glow)" }}>
+                <Video size={14} />
+                {t("nav.record")}
+              </Link>
+
+              {/* أفاتار مع قائمة منسدلة */}
+              <div ref={menuRef} style={{ position: "relative" }}>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "4px 10px 4px 8px",
+                    background: "var(--bg-card)", border: `1px solid ${menuOpen ? "rgba(52,211,153,0.4)" : "var(--border)"}`,
+                    borderRadius: 10, cursor: "pointer", fontFamily: "var(--font)",
+                    transition: "border-color var(--transition)", width: "auto",
+                  }}
+                >
+                  <span style={{
+                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                    background: "linear-gradient(135deg, var(--green), var(--purple))",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 800, color: "#04120c",
+                  }}>
+                    {user.name?.[0]?.toUpperCase() || "?"}
+                  </span>
+                  <span className="nav-user-name" style={{ fontSize: 13, color: "var(--text)", fontWeight: 600 }}>
+                    {user.name?.split(" ")[0]}
+                  </span>
+                  <ChevronDown size={13} color="var(--text-muted)"
+                    style={{ transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+                </button>
+
+                {menuOpen && (
+                  <div className="dropdown-menu" role="menu">
+                    <div style={{ padding: "8px 12px 10px", borderBottom: "1px solid var(--border)", marginBottom: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }} className="text-truncate">{user.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }} className="text-truncate">{user.email}</div>
+                    </div>
+                    <Link to="/settings" className="dropdown-item" onClick={() => setMenuOpen(false)} role="menuitem">
+                      <Settings size={15} />
+                      {t("nav.settings")}
+                    </Link>
+                    <button className="dropdown-item danger" onClick={handleLogout} role="menuitem">
+                      <LogOut size={15} />
+                      {t("nav.logout")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <Link to="/auth" className="btn btn-outline btn-sm">{t("nav.login")}</Link>
+              <Link to="/auth?mode=register" className="btn btn-primary btn-sm" style={{ boxShadow: "0 0 16px var(--green-glow)" }}>
+                {t("nav.register")}
+              </Link>
+            </>
+          )}
+        </div>
+      </nav>
+
+      {/* قائمة الموبايل */}
+      {user && mobileOpen && (
+        <div className="nav-mobile-menu">
+          {NAV_LINKS.map((l) => (
+            <NavLink key={l.to} to={l.to}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+              style={{ display: "flex", alignItems: "center", gap: 10 }}
+            >
+              {l.icon}
+              {l.label}
+            </NavLink>
           ))}
+          <NavLink to="/settings"
+            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+            style={{ display: "flex", alignItems: "center", gap: 10 }}
+          >
+            <Settings size={15} />
+            {t("nav.settings")}
+          </NavLink>
         </div>
       )}
-
-      {/* يمين */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        {/* زر تبديل اللغة */}
-        <button onClick={toggleLanguage} style={{
-          padding: "5px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-          color: "#888", background: "transparent", border: "1px solid #1e1e30",
-          cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
-        }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#818CF866"; e.currentTarget.style.color = "#ccc"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e1e30"; e.currentTarget.style.color = "#888"; }}
-        >
-          {i18n.language === "ar" ? "EN" : "عربي"}
-        </button>
-
-        {user ? (
-          <>
-            <Link to="/record" style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              background: "#34D399", color: "#000", padding: "7px 16px",
-              borderRadius: 10, fontWeight: 800, fontSize: 13, textDecoration: "none",
-              boxShadow: "0 0 16px #34D39930", transition: "all 0.2s",
-            }}
-              onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 24px #34D39950"}
-              onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 0 16px #34D39930"}
-            >
-              <span style={{ fontSize: 12 }}>⏺</span> {t("nav.record")}
-            </Link>
-
-            {/* أفاتار مع قائمة منسدلة */}
-            <div ref={menuRef} style={{ position: "relative" }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "5px 12px",
-                background: "#0d0d1a", border: "1px solid #1e1e30", borderRadius: 10,
-                cursor: "pointer", transition: "border-color 0.2s",
-              }}
-                onClick={() => setMenuOpen(!menuOpen)}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = "#34D39966"}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = "#1e1e30"}
-              >
-                <div style={{
-                  width: 26, height: 26, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #34D399, #818CF8)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 800, color: "#000",
-                }}>
-                  {user.name?.[0] || "?"}
-                </div>
-                <span style={{ fontSize: 13, color: "#ccc" }}>{user.name?.split(" ")[0]}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" style={{ transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </div>
-
-              {menuOpen && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", right: 0,
-                  minWidth: 160, background: "#0d0d1a", border: "1px solid #1e1e30",
-                  borderRadius: 10, padding: "6px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-                  animation: "fadeIn 0.15s ease",
-                }}>
-                  <Link to="/settings" onClick={() => setMenuOpen(false)} style={{
-                    display: "block", padding: "8px 14px", borderRadius: 8,
-                    fontSize: 13, color: "#ccc", textDecoration: "none",
-                    transition: "background 0.15s",
-                  }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#ffffff08"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                  >{t("nav.settings")}</Link>
-                  <button onClick={() => { setMenuOpen(false); logout().then?.(() => navigate("/")) || (logout(), navigate("/")); }} style={{
-                    display: "block", width: "100%", padding: "8px 14px", borderRadius: 8,
-                    fontSize: 13, color: "var(--red)", textAlign: "right",
-                    background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font)",
-                    transition: "background 0.15s",
-                  }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#F8717110"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                  >{t("nav.logout")}</button>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <Link to="/auth" style={{
-              padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-              color: "#888", textDecoration: "none", background: "transparent",
-              border: "1px solid #1e1e30", transition: "all 0.2s",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#34D39966"; e.currentTarget.style.color = "#ccc"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e1e30"; e.currentTarget.style.color = "#888"; }}
-            >{t("nav.login")}</Link>
-
-            <Link to="/auth?mode=register" style={{
-              padding: "7px 16px", borderRadius: 10, fontSize: 13, fontWeight: 800,
-              color: "#000", textDecoration: "none", background: "#34D399",
-              boxShadow: "0 0 16px #34D39930", transition: "all 0.2s",
-            }}>{t("nav.register")}</Link>
-          </>
-        )}
-      </div>
-    </nav>
+    </>
   );
 }

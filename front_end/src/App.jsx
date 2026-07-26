@@ -1,6 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { useTranslation } from "react-i18next";
+import { ToastProvider } from "./components/ui/Toast";
+import { PageLoader } from "./components/ui/Primitives";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
@@ -11,24 +14,26 @@ import Search from "./pages/Search";
 import Settings from "./pages/Settings";
 
 function Protected({ children }) {
-  const { user, loading, verified } = useAuth();
+  const { loading, verified } = useAuth();
   const { t } = useTranslation();
 
-  if (loading) return (
-    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "60vh", gap: 16 }}>
-      <div className="spin" style={{ width: 36, height: 36, border: "3px solid #1e1e30", borderTopColor: "#34D399", borderRadius: "50%" }} />
-      <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("loading")}</span>
-    </div>
-  );
-
+  if (loading) return <PageLoader label={t("loading")} />;
   if (!verified) return <Navigate to="/auth" replace />;
 
   return children;
 }
 
+/* التمرير لأعلى الصفحة عند تغيير المسار */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 function AppRoutes() {
   return (
     <>
+      <ScrollToTop />
       <Navbar />
       <Routes>
         <Route path="/"          element={<Home />} />
@@ -54,7 +59,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -182,7 +182,10 @@
     "views": "views",
     "hls_badge": "HLS",
     "analytics_title": "Video Analytics",
-    "copy_link_title": "Copy share link"
+    "copy_link_title": "Copy share link",
+    "confirm_delete_btn": "Delete",
+    "cancel_btn": "Cancel",
+    "deleted_success": "Recording deleted"
   },
   "player": {
     "transcript": "Transcript",
@@ -261,11 +264,30 @@
     "minute_short": "m",
     "second_short": "s",
     "countries": {
-      "SA": "Saudi Arabia", "AE": "UAE", "EG": "Egypt", "KW": "Kuwait", "QA": "Qatar",
-      "BH": "Bahrain", "OM": "Oman", "JO": "Jordan", "LB": "Lebanon", "IQ": "Iraq",
-      "SY": "Syria", "MA": "Morocco", "TN": "Tunisia", "DZ": "Algeria", "LY": "Libya",
-      "YE": "Yemen", "PS": "Palestine", "SD": "Sudan", "US": "USA", "GB": "UK",
-      "DE": "Germany", "FR": "France", "TR": "Turkey", "local": "Local"
+      "SA": "Saudi Arabia",
+      "AE": "UAE",
+      "EG": "Egypt",
+      "KW": "Kuwait",
+      "QA": "Qatar",
+      "BH": "Bahrain",
+      "OM": "Oman",
+      "JO": "Jordan",
+      "LB": "Lebanon",
+      "IQ": "Iraq",
+      "SY": "Syria",
+      "MA": "Morocco",
+      "TN": "Tunisia",
+      "DZ": "Algeria",
+      "LY": "Libya",
+      "YE": "Yemen",
+      "PS": "Palestine",
+      "SD": "Sudan",
+      "US": "USA",
+      "GB": "UK",
+      "DE": "Germany",
+      "FR": "France",
+      "TR": "Turkey",
+      "local": "Local"
     }
   },
   "settings": {
@@ -303,13 +325,30 @@
     "title": "Choose Your Plan",
     "subtitle": "Pay with Visa or Mastercard — value delivered via USDT",
     "free_name": "Free",
-    "free_features": ["25 recordings", "5 min per clip", "Basic transcription", "Share link"],
+    "free_features": [
+      "25 recordings",
+      "5 min per clip",
+      "Basic transcription",
+      "Share link"
+    ],
     "free_cta": "Your Current Plan",
     "pro_name": "Pro",
-    "pro_features": ["Unlimited", "Full hour per clip", "AI translation + summary", "DOCX + SRT export", "No watermark"],
+    "pro_features": [
+      "Unlimited",
+      "Full hour per clip",
+      "AI translation + summary",
+      "DOCX + SRT export",
+      "No watermark"
+    ],
     "pro_cta": "Subscribe Now",
     "team_name": "Team",
-    "team_features": ["All Pro features", "5 members", "Shared Workspace", "Developer API", "Priority support"],
+    "team_features": [
+      "All Pro features",
+      "5 members",
+      "Shared Workspace",
+      "Developer API",
+      "Priority support"
+    ],
     "team_cta": "Subscribe Now",
     "popular_badge": "Most Popular",
     "current_plan": "✅ Your Current Plan",

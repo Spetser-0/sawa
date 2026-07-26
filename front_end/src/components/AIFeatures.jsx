@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { aiAPI } from "../api/client";
+import { Globe, Sparkles, Users, AlertCircle } from "lucide-react";
 
 export default function AIFeatures({ videoId, transcriptDone }) {
   const { t } = useTranslation();
@@ -61,7 +62,7 @@ export default function AIFeatures({ videoId, transcriptDone }) {
             display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
           }}
         >
-          <span style={{ fontSize: 20 }}>🌍</span>
+          <Globe size={20} />
           <span style={{ fontWeight: 600 }}>{t("ai_features.translate")}</span>
           <span style={{ fontSize: 10, opacity: 0.7 }}>{t("ai_features.translate_desc")}</span>
         </button>
@@ -78,7 +79,7 @@ export default function AIFeatures({ videoId, transcriptDone }) {
             display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
           }}
         >
-          <span style={{ fontSize: 20 }}>🤖</span>
+          <Sparkles size={20} />
           <span style={{ fontWeight: 600 }}>{t("ai_features.summarize")}</span>
           <span style={{ fontSize: 10, opacity: 0.7 }}>{t("ai_features.summarize_desc")}</span>
         </button>
@@ -95,7 +96,7 @@ export default function AIFeatures({ videoId, transcriptDone }) {
             display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
           }}
         >
-          <span style={{ fontSize: 20 }}>👥</span>
+          <Users size={20} />
           <span style={{ fontWeight: 600 }}>{t("ai_features.speakers")}</span>
           <span style={{ fontSize: 10, opacity: 0.7 }}>{t("ai_features.speakers_desc")}</span>
         </button>
@@ -115,8 +116,8 @@ export default function AIFeatures({ videoId, transcriptDone }) {
 
       {/* ── خطأ ───────────────────────────────────── */}
       {error && (
-        <div style={{ padding: "12px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 12, color: "#F87171", whiteSpace: "pre-wrap" }}>
-          ❌ {error}
+        <div style={{ padding: "12px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 12, color: "#F87171", whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: 8 }}>
+          <AlertCircle size={14} style={{ flexShrink: 0 }} /> {error}
         </div>
       )}
 

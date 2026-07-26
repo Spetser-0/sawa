@@ -9,6 +9,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell,
 } from "recharts";
+import { X, Eye, Users, Clock, TrendingUp, Globe, AlertTriangle, Inbox } from "lucide-react";
 
 const COUNTRY_NAMES = {
   SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر",
@@ -27,13 +28,14 @@ function fmtDur(sec, t) {
 }
 
 function MetricCard({ icon, label, value, color }) {
+  // icon أصبح عنصر React (أيقونة SVG)
   return (
     <div style={{
       background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 12,
       padding: "16px 20px", display: "flex", flexDirection: "column", gap: 6,
       borderTop: `3px solid ${color}`,
     }}>
-      <div style={{ fontSize: 22 }}>{icon}</div>
+      <div style={{ display: "flex" }}>{icon}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color }}>{value}</div>
       <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</div>
     </div>
@@ -89,7 +91,7 @@ export default function Analytics({ videoId, onClose }) {
           <button onClick={onClose} style={{
             background: "none", border: "none", cursor: "pointer",
             color: "var(--text-muted)", fontSize: 22, lineHeight: 1,
-          }}>✕</button>
+          }} aria-label="close"><X size={20} /></button>
         </div>
 
         {loading && (
@@ -101,7 +103,9 @@ export default function Analytics({ videoId, onClose }) {
 
         {error && (
           <div style={{ textAlign: "center", padding: "40px 0", color: "var(--red)" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+              <AlertTriangle size={34} />
+            </div>
             <div>{error}</div>
           </div>
         )}
@@ -110,16 +114,16 @@ export default function Analytics({ videoId, onClose }) {
           <>
             {/* بطاقات الأرقام */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
-              <MetricCard icon="👁️" label={t("analytics.total_views")} value={data.total_views.toLocaleString("ar")} color="#34D399" />
-              <MetricCard icon="👤" label={t("analytics.unique_viewers")} value={data.unique_viewers.toLocaleString("ar")} color="#818CF8" />
-              <MetricCard icon="⏱️" label={t("analytics.avg_watch_duration")} value={fmtDur(data.avg_watch_duration, t)} color="#F59E0B" />
+              <MetricCard icon={<Eye size={20} color="#34D399" />} label={t("analytics.total_views")} value={data.total_views.toLocaleString("ar")} color="#34D399" />
+              <MetricCard icon={<Users size={20} color="#818CF8" />} label={t("analytics.unique_viewers")} value={data.unique_viewers.toLocaleString("ar")} color="#818CF8" />
+              <MetricCard icon={<Clock size={20} color="#F59E0B" />} label={t("analytics.avg_watch_duration")} value={fmtDur(data.avg_watch_duration, t)} color="#F59E0B" />
             </div>
 
             {/* مخطط الاحتفاظ */}
             {fmtRetention.length > 0 && (
               <div style={{ marginBottom: 28 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--text-muted)" }}>
-                  📈 {t("analytics.retention_curve")}
+                  <TrendingUp size={14} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />{t("analytics.retention_curve")}
                 </h3>
                 <div style={{ background: "var(--bg)", borderRadius: 12, padding: "16px 8px", border: "1px solid var(--border)" }}>
                   <ResponsiveContainer width="100%" height={200}>
@@ -158,7 +162,7 @@ export default function Analytics({ videoId, onClose }) {
             {fmtCountries.length > 0 && (
               <div>
                 <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--text-muted)" }}>
-                  🌍 {t("analytics.country_distribution")}
+                  <Globe size={14} style={{ verticalAlign: "middle", marginInlineEnd: 6 }} />{t("analytics.country_distribution")}
                 </h3>
                 <div style={{ background: "var(--bg)", borderRadius: 12, padding: "16px 8px", border: "1px solid var(--border)" }}>
                   <ResponsiveContainer width="100%" height={180}>
@@ -186,7 +190,9 @@ export default function Analytics({ videoId, onClose }) {
 
             {data.total_views === 0 && (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-muted)" }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, opacity: 0.5 }}>
+                  <Inbox size={36} />
+                </div>
                 <div>{t("analytics.no_data")}</div>
                 <div style={{ fontSize: 12, marginTop: 8 }}>{t("analytics.share_to_start")}</div>
               </div>

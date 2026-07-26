@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           vendor: ["react", "react-dom", "react-router-dom"],
+          hls: ["hls.js"],
+          charts: ["recharts"],
+          i18n: ["i18next", "react-i18next"],
+          icons: ["lucide-react"],
         },
       },
     },

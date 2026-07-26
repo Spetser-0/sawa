@@ -5,6 +5,10 @@
 import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import {
+  Search as SearchIcon, Mic, MonitorPlay, Play,
+  ChevronDown, ChevronUp, SearchX, AlertCircle,
+} from "lucide-react";
 
 function fmtTime(s) {
   const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -89,7 +93,13 @@ export default function Search() {
 
       {/* ── رأس الصفحة ──────────────────────────────── */}
       <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+        <div style={{
+          width: 64, height: 64, borderRadius: 18, margin: "0 auto 16px",
+          background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <SearchIcon size={28} color="var(--green)" />
+        </div>
           <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8 }}>
             {t("search.title")}
           </h1>
@@ -107,7 +117,7 @@ export default function Search() {
             onChange={handleChange}
             placeholder={t("search.placeholder")}
             style={{
-              width: "100%", padding: "16px 56px 16px 20px",
+              width: "100%", padding: "16px 20px", paddingInlineEnd: 56,
               fontSize: 16, borderRadius: 14,
               border: "2px solid var(--border)",
               background: "var(--bg-card)",
@@ -118,16 +128,16 @@ export default function Search() {
             onFocus={(e) => e.target.style.borderColor = "#34D399"}
             onBlur={(e) => e.target.style.borderColor = "var(--border)"}
           />
-          <button type="submit"
+          <button type="submit" aria-label={t("search.title")}
             style={{
-              position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+              position: "absolute", insetInlineEnd: 12, top: "50%", transform: "translateY(-50%)",
               background: "var(--green)", border: "none", borderRadius: 10,
-              width: 36, height: 36, cursor: "pointer", fontSize: 16,
+              width: 36, height: 36, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
             {loading
               ? <span className="spin" style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
-              : "→"
+              : <SearchIcon size={17} color="#04120c" strokeWidth={2.5} />
             }
           </button>
         </div>
@@ -146,7 +156,9 @@ export default function Search() {
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                 onClick={() => { setQuery(s); setSuggestions([]); doSearch(s); }}
               >
-                🔍 {s}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <SearchIcon size={13} color="var(--text-muted)" /> {s}
+                </span>
               </div>
             ))}
           </div>
@@ -155,7 +167,8 @@ export default function Search() {
 
       {/* خطأ */}
       {error && (
-        <div style={{ padding: "12px 16px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, color: "var(--red)", fontSize: 13, marginBottom: 16 }}>
+        <div style={{ padding: "12px 16px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, color: "var(--red)", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <AlertCircle size={15} style={{ flexShrink: 0 }} />
           {error}
         </div>
       )}
@@ -165,7 +178,9 @@ export default function Search() {
         <div style={{ marginBottom: 20 }}>
           {results.total_matches === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 20px", background: "var(--bg-card)", border: "1px dashed var(--border)", borderRadius: 14 }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>😶</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                <SearchX size={36} color="var(--text-muted)" />
+              </div>
               <div style={{ fontWeight: 700, marginBottom: 6 }}>{t("search.no_results")}</div>
               <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
                 {t("search.no_results_desc", { query: results.query })}
@@ -205,7 +220,13 @@ export default function Search() {
             onClick={() => setExpanded(p => ({ ...p, [result.video_id]: !p[result.video_id] }))}
           >
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 20 }}>🖥️</span>
+              <span style={{
+                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <MonitorPlay size={18} color="var(--green)" />
+              </span>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{result.video_title}</div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
@@ -218,7 +239,9 @@ export default function Search() {
               <span style={{ background: "#34D39920", color: "#34D399", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700 }}>
                 {result.match_count} {t("search.result_count")}
               </span>
-              <span style={{ color: "var(--text-muted)" }}>{expanded[result.video_id] ? "▲" : "▼"}</span>
+              <span style={{ color: "var(--text-muted)", display: "flex" }}>
+                {expanded[result.video_id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </span>
             </div>
           </div>
 
@@ -260,7 +283,9 @@ export default function Search() {
                   </div>
 
                   {/* زر الانتقال */}
-                  <div style={{ flexShrink: 0, fontSize: 16, color: "var(--text-muted)" }}>▶</div>
+                  <div style={{ flexShrink: 0, color: "var(--text-muted)", display: "flex", alignItems: "center" }}>
+                    <Play size={15} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -271,7 +296,9 @@ export default function Search() {
       {/* ── نقطة فارغة ──────────────────────────────── */}
       {!results && !loading && (
         <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)" }}>
-          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🎙️</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16, opacity: 0.35 }}>
+            <Mic size={48} />
+          </div>
           <div style={{ fontSize: 14 }}>{t("search.empty_state")}</div>
           <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>
             {t("search.empty_example")}

@@ -5,6 +5,10 @@
 import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { videosAPI } from "../api/client";
+import {
+  FolderOpen, Cloud, Video, Camera, CheckCircle2,
+  UploadCloud, MicOff, Pause, Play, Square, AlertCircle,
+} from "lucide-react";
 
 const LANGUAGES = [
   { value: "ar",    label: "العربية" },
@@ -433,7 +437,7 @@ export default function Recorder({ onUploadDone }) {
                 onClick={() => fileInputRef.current?.click()}
                 style={{ width: "100%", justifyContent: "center" }}
               >
-                <span style={{ fontSize: 16 }}>📂</span>
+                <FolderOpen size={16} />
                 {t("recorder.choose_file")}
               </button>
             </div>
@@ -508,19 +512,19 @@ export default function Recorder({ onUploadDone }) {
                   onClick={() => fileInputRef.current?.click()}
                   style={{ flex: 1, justifyContent: "center" }}
                 >
-                  <span>📂</span> {t("recorder.choose_file")}
+                  <FolderOpen size={15} /> {t("recorder.choose_file")}
                 </button>
                 <button
                   className="btn btn-outline"
                   onClick={handleGoogleDriveImport}
                   style={{ flex: 1, justifyContent: "center", borderColor: "#818CF833", color: "#818CF8" }}
                 >
-                  <span>☁️</span> Google Drive
+                  <Cloud size={15} /> Google Drive
                 </button>
               </>
             ) : (
               <button className="btn btn-primary btn-lg" onClick={startRecording} style={{ width: "100%", justifyContent: "center" }}>
-                <span style={{ fontSize: 18 }}>{mode === "camera" || isMobile ? "📹" : "⏺"}</span>
+                {mode === "camera" || isMobile ? <Camera size={18} /> : <Video size={18} />}
                 {t("recorder.start_recording")}
               </button>
             )}
@@ -531,9 +535,11 @@ export default function Recorder({ onUploadDone }) {
       {(state === "recording" || state === "paused") && (
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
           <button className="btn btn-outline" onClick={togglePause}>
+            {state === "recording" ? <Pause size={15} /> : <Play size={15} />}
             {state === "recording" ? t("recorder.pause") : t("recorder.resume")}
           </button>
           <button className="btn btn-danger" onClick={stopRecording}>
+            <Square size={14} />
             {t("recorder.stop_and_upload")}
           </button>
         </div>
@@ -541,7 +547,9 @@ export default function Recorder({ onUploadDone }) {
 
       {state === "uploading" && (
         <div className="card fade-in" style={{ textAlign: "center", marginTop: 16 }}>
-          <div style={{ fontSize: 24, marginBottom: 12 }}>☁️</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <UploadCloud size={28} color="var(--green)" className="float" />
+          </div>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>
             {noiseReduction ? t("recorder.uploading_denoising") : t("recorder.uploading")}
           </div>
@@ -550,8 +558,8 @@ export default function Recorder({ onUploadDone }) {
           </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{progress}%</div>
           {noiseReduction && (
-            <div style={{ fontSize: 12, color: "var(--purple)", marginTop: 8 }}>
-              🔇 {t("recorder.denoising_filter")}
+            <div style={{ fontSize: 12, color: "var(--purple)", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <MicOff size={13} /> {t("recorder.denoising_filter")}
             </div>
           )}
         </div>
@@ -559,7 +567,9 @@ export default function Recorder({ onUploadDone }) {
 
       {state === "done" && (
         <div className="card fade-in" style={{ textAlign: "center", marginTop: 16, border: "1px solid #34D39944" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+            <CheckCircle2 size={32} color="var(--green)" />
+          </div>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("recorder.upload_done")}</div>
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
             {noiseReduction
@@ -576,7 +586,8 @@ export default function Recorder({ onUploadDone }) {
       )}
 
       {error && (
-        <div style={{ marginTop: 12, padding: "12px 16px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 13, color: "#F87171" }}>
+        <div style={{ marginTop: 12, padding: "12px 16px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 13, color: "#F87171", display: "flex", alignItems: "center", gap: 8 }}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
           {error}
         </div>
       )}

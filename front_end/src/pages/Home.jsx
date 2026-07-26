@@ -5,6 +5,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import {
+  Mic, BrainCircuit, Search, Globe, FileText, Lock,
+  Rocket, Check, X, Video, Languages, Sparkles, File,
+} from "lucide-react";
 
 /* ─────────────────────────────────────────────────────
    Hook: تتبع موضع الماوس للـ 3D tilt
@@ -235,9 +239,14 @@ function ProductMockup() {
 
       {/* شريط الأدوات */}
       <div style={{ display:"flex", gap:6 }}>
-        {["🌍 ترجمة","🤖 تلخيص","📄 .docx"].map(btn => (
-          <div key={btn} style={{ flex:1, textAlign:"center", padding:"6px", background:"#ffffff08", border:"1px solid #ffffff10", borderRadius:8, fontSize:11, color:"#888" }}>
-            {btn}
+        {[
+          { icon: <Languages size={12} />, label: "ترجمة" },
+          { icon: <Sparkles size={12} />, label: "تلخيص" },
+          { icon: <File size={12} />, label: ".docx" },
+        ].map((btn) => (
+          <div key={btn.label} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:5, padding:"6px", background:"#ffffff08", border:"1px solid #ffffff10", borderRadius:8, fontSize:11, color:"#888" }}>
+            {btn.icon}
+            {btn.label}
           </div>
         ))}
       </div>
@@ -327,18 +336,84 @@ function CompareRow({ feature, sawa, loom, delay }) {
     }}>
       <td style={{ padding:"12px 16px", fontSize:13, color:"#ccc" }}>{feature}</td>
       <td style={{ textAlign:"center", padding:"12px" }}>
-        <span style={{ fontSize:18, filter: sawa ? "drop-shadow(0 0 6px #34D399)" : "none" }}>
-          {sawa ? "✅" : "❌"}
-        </span>
+        {sawa
+          ? <Check size={18} color="#34D399" style={{ filter:"drop-shadow(0 0 6px #34D399)" }} strokeWidth={3} />
+          : <X size={18} color="#F87171" strokeWidth={3} />}
       </td>
       <td style={{ textAlign:"center", padding:"12px" }}>
-        <span style={{ fontSize:18 }}>{loom ? "✅" : "❌"}</span>
+        {loom
+          ? <Check size={18} color="#666" strokeWidth={3} />
+          : <X size={18} color="#444" strokeWidth={3} />}
       </td>
     </tr>
   );
 }
 
 /* ─────────────────────────────────────────────────────
+   Component: بطاقة خطة أسعار (مكوّن مستقل — احتراماً لقواعد Hooks)
+───────────────────────────────────────────────── */
+function PricingCard({ plan, index, startFreeLabel, subscribeLabel, popularLabel }) {
+  const [ref, vis] = useReveal();
+  const [hov, setHov] = useState(false);
+  const p = plan;
+
+  return (
+    <div ref={ref} style={{
+      opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(30px)",
+      transition: `all 0.6s ease ${index * 120}ms`,
+    }}>
+      <Card3D style={{ height:"100%" }}>
+        <div
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{
+            background: p.popular ? `linear-gradient(135deg, ${p.color}12, #0d0d1a)` : "#0d0d1a",
+            border: `${p.popular ? 2 : 1}px solid ${hov || p.popular ? p.color + "55" : "#1e1e30"}`,
+            borderRadius:16, padding:24, position:"relative",
+            transition:"all 0.3s", height:"100%", boxSizing:"border-box",
+            boxShadow: p.popular ? `0 0 40px ${p.color}15` : "none",
+          }}
+        >
+          {p.popular && (
+            <div style={{
+              position:"absolute", top:-12, right:20,
+              background:`linear-gradient(90deg, #34D399, #818CF8)`,
+              color:"#000", borderRadius:20, padding:"3px 14px",
+              fontSize:11, fontWeight:900,
+            }}>{popularLabel}</div>
+          )}
+          <div style={{ color:p.color, fontWeight:800, fontSize:15, marginBottom:10 }}>{p.name}</div>
+          <div style={{ marginBottom:20 }}>
+            <span style={{ fontSize:36, fontWeight:900, color:"#fff" }}>${p.price}</span>
+            <span style={{ fontSize:13, color:"#666" }}>{p.period}</span>
+          </div>
+          {p.features.map(f => (
+            <div key={f} style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
+              <Check size={13} color={p.color} strokeWidth={3} style={{ flexShrink:0 }} />
+              <span style={{ fontSize:13, color:"#bbb" }}>{f}</span>
+            </div>
+          ))}
+          <Link to={p.price > 0 ? "/pricing" : "/auth"}
+            style={{
+              display:"block", width:"100%", textAlign:"center",
+              padding:"11px", marginTop:20, borderRadius:10,
+              background: p.popular ? p.color : "transparent",
+              color: p.popular ? "#000" : p.color,
+              border:`1px solid ${p.color}66`,
+              fontWeight:800, fontSize:14, textDecoration:"none",
+              transition:"all 0.2s", boxSizing:"border-box",
+              boxShadow: p.popular ? `0 0 20px ${p.color}30` : "none",
+            }}
+          >
+            {p.price === 0 ? startFreeLabel : subscribeLabel}
+          </Link>
+        </div>
+      </Card3D>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    Main: Home Page
 ───────────────────────────────────────────────────── */
 export default function Home() {
@@ -346,12 +421,12 @@ export default function Home() {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
 
   const FEATURES = [
-    { icon:"🎙️", title: t("home.feature_recording"), desc: t("home.feature_recording_desc"), color:"#34D399" },
-    { icon:"🧠", title: t("home.feature_transcription"), desc: t("home.feature_transcription_desc"), color:"#818CF8" },
-    { icon:"🔍", title: t("home.feature_search"), desc: t("home.feature_search_desc"), color:"#F59E0B" },
-    { icon:"🌍", title: t("home.feature_ai"), desc: t("home.feature_ai_desc"), color:"#F472B6" },
-    { icon:"📄", title: t("home.feature_export"), desc: t("home.feature_export_desc"), color:"#60A5FA" },
-    { icon:"🔒", title: t("home.feature_privacy"), desc: t("home.feature_privacy_desc"), color:"#C084FC" },
+    { icon:<Mic size={22} color="#34D399" />, title: t("home.feature_recording"), desc: t("home.feature_recording_desc"), color:"#34D399" },
+    { icon:<BrainCircuit size={22} color="#818CF8" />, title: t("home.feature_transcription"), desc: t("home.feature_transcription_desc"), color:"#818CF8" },
+    { icon:<Search size={22} color="#F59E0B" />, title: t("home.feature_search"), desc: t("home.feature_search_desc"), color:"#F59E0B" },
+    { icon:<Globe size={22} color="#F472B6" />, title: t("home.feature_ai"), desc: t("home.feature_ai_desc"), color:"#F472B6" },
+    { icon:<FileText size={22} color="#60A5FA" />, title: t("home.feature_export"), desc: t("home.feature_export_desc"), color:"#60A5FA" },
+    { icon:<Lock size={22} color="#C084FC" />, title: t("home.feature_privacy"), desc: t("home.feature_privacy_desc"), color:"#C084FC" },
   ];
   const heroRef = useRef(null);
   const [heroRef2, heroVis] = useReveal();
@@ -382,7 +457,7 @@ export default function Home() {
           transition:"left 0.1s, top 0.1s",
         }} />
 
-        <div style={{ maxWidth:1100, width:"100%", display:"grid", gridTemplateColumns:"1fr 1fr", gap:60, alignItems:"center" }}>
+        <div className="hero-grid" style={{ maxWidth:1100, width:"100%", display:"grid", gridTemplateColumns:"1fr 1fr", gap:60, alignItems:"center" }}>
 
           {/* نص الهيرو */}
           <div>
@@ -431,7 +506,7 @@ export default function Home() {
                 onMouseEnter={(e)=>e.currentTarget.style.boxShadow="0 0 50px #34D39960"}
                 onMouseLeave={(e)=>e.currentTarget.style.boxShadow="0 0 30px #34D39940"}
               >
-                <span style={{ fontSize:18 }}>⏺</span>
+                <Video size={18} />
                 {t("home.cta_start")}
               </Link>
               <Link to="/auth" style={{
@@ -562,64 +637,16 @@ export default function Home() {
               { name:t("pricing.free_name"),  price:0,  color:"#555",    period:"",       features:[t("home.feature_recording"), t("home.feature_search"), t("home.feature_privacy")], popular:false },
               { name:t("pricing.pro_name"),    price:7,  color:"#34D399", period:"/شهر",   features:[t("home.feature_ai"), t("home.feature_export"), t("home.feature_transcription"), t("home.feature_privacy")], popular:true },
               { name:t("pricing.team_name"),   price:20, color:"#818CF8", period:"/شهر",   features:[t("home.feature_recording"), t("home.feature_search"), t("home.feature_ai"), t("home.feature_export")], popular:false },
-            ].map((p, i) => {
-              const [ref, vis] = useReveal();
-              const [hov, setHov] = useState(false);
-              return (
-                <div key={p.name} ref={ref} style={{
-                  opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(30px)",
-                  transition: `all 0.6s ease ${i * 120}ms`,
-                }}>
-                  <Card3D style={{ height:"100%" }}>
-                    <div
-                      onMouseEnter={() => setHov(true)}
-                      onMouseLeave={() => setHov(false)}
-                      style={{
-                        background: p.popular ? `linear-gradient(135deg, ${p.color}12, #0d0d1a)` : "#0d0d1a",
-                        border: `${p.popular ? 2 : 1}px solid ${hov || p.popular ? p.color + "55" : "#1e1e30"}`,
-                        borderRadius:16, padding:24, position:"relative",
-                        transition:"all 0.3s", height:"100%", boxSizing:"border-box",
-                        boxShadow: p.popular ? `0 0 40px ${p.color}15` : "none",
-                      }}
-                    >
-                      {p.popular && (
-                        <div style={{
-                          position:"absolute", top:-12, right:20,
-                          background:`linear-gradient(90deg, #34D399, #818CF8)`,
-                          color:"#000", borderRadius:20, padding:"3px 14px",
-                          fontSize:11, fontWeight:900,
-                        }}>{t("home.popular")}</div>
-                      )}
-                      <div style={{ color:p.color, fontWeight:800, fontSize:15, marginBottom:10 }}>{p.name}</div>
-                      <div style={{ marginBottom:20 }}>
-                        <span style={{ fontSize:36, fontWeight:900, color:"#fff" }}>${p.price}</span>
-                        <span style={{ fontSize:13, color:"#666" }}>{p.period}</span>
-                      </div>
-                      {p.features.map(f => (
-                        <div key={f} style={{ display:"flex", gap:8, marginBottom:8 }}>
-                          <span style={{ color:p.color, fontSize:13 }}>✓</span>
-                          <span style={{ fontSize:13, color:"#bbb" }}>{f}</span>
-                        </div>
-                      ))}
-                      <Link to={p.price > 0 ? "/pricing" : "/auth"}
-                        style={{
-                          display:"block", width:"100%", textAlign:"center",
-                          padding:"11px", marginTop:20, borderRadius:10,
-                          background: p.popular ? p.color : "transparent",
-                          color: p.popular ? "#000" : p.color,
-                          border:`1px solid ${p.color}66`,
-                          fontWeight:800, fontSize:14, textDecoration:"none",
-                          transition:"all 0.2s", boxSizing:"border-box",
-                          boxShadow: p.popular ? `0 0 20px ${p.color}30` : "none",
-                        }}
-                      >
-                        {p.price === 0 ? t("home.start_free") : t("home.subscribe_now")}
-                      </Link>
-                    </div>
-                  </Card3D>
-                </div>
-              );
-            })}
+            ].map((p, i) => (
+              <PricingCard
+                key={p.name}
+                plan={p}
+                index={i}
+                startFreeLabel={t("home.start_free")}
+                subscribeLabel={t("home.subscribe_now")}
+                popularLabel={t("home.popular")}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -637,7 +664,13 @@ export default function Home() {
             <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"#34D39920", filter:"blur(60px)" }} />
             <div style={{ position:"absolute", bottom:-40, left:-40, width:160, height:160, borderRadius:"50%", background:"#818CF820", filter:"blur(50px)" }} />
             <div style={{ position:"relative" }}>
-              <div style={{ fontSize:40, marginBottom:16 }}>🚀</div>
+              <div style={{
+                width:64, height:64, borderRadius:18, margin:"0 auto 20px",
+                background:"rgba(52,211,153,0.12)", border:"1px solid rgba(52,211,153,0.3)",
+                display:"flex", alignItems:"center", justifyContent:"center",
+              }} className="float">
+                <Rocket size={28} color="#34D399" />
+              </div>
               <h2 style={{ fontSize:26, fontWeight:900, marginBottom:12 }}>
                 {t("home.cta_title")}
               </h2>

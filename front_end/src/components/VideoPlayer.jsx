@@ -6,6 +6,11 @@ import { transcriptAPI, aiAPI, commentsAPI, analyticsAPI, videosAPI } from "../a
 import AIFeatures from "./AIFeatures";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../hooks/useAuth";
+import {
+  Eye, Clock, Calendar, Link2, Sparkles, ChevronUp, ChevronDown,
+  Trash2, Check, Copy, Pencil, Loader2, AlertCircle, RotateCcw,
+} from "lucide-react";
+import { useToast } from "./ui/Toast";
 
 // Optional import for HLS (we'll check dynamically or assume it's bundled if imported)
 // For a standard Vite project, we just import it:
@@ -21,6 +26,7 @@ const speakerColor = (name) => {
 const fmtTime = (s) => `${Math.floor(s/60).toString().padStart(2,"0")}:${Math.floor(s%60).toString().padStart(2,"0")}`;
 
 export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken = null }) {
+  const toast = useToast();
   const [transcript,   setTranscript]   = useState(null);
   const [status,       setStatus]       = useState("loading");
   const [currentTime,  setCurrentTime]  = useState(0);
@@ -170,7 +176,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       await transcriptAPI.edit(video.id, { full_text: editText });
       setTranscript((t) => ({ ...t, full_text: editText }));
       setIsEditing(false);
-    } catch (e) {       alert(t("player.save_failed") + e.message); }
+    } catch (e) { toast.error(t("player.save_failed") + e.message); }
   };
 
   // Feature 2
@@ -180,7 +186,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       const res = await aiAPI.generateChapters(video.id);
       setChapters(res.chapters);
     } catch (e) {
-      alert(t("player.generate_chapters_failed") + e.message);
+      toast.error(t("player.generate_chapters_failed") + e.message);
     } finally {
       setGeneratingChapters(false);
     }
@@ -200,7 +206,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       setComments([...comments, c].sort((a,b) => a.timestamp_seconds - b.timestamp_seconds));
       setCommentText("");
     } catch (e) {
-      alert(t("player.add_comment_failed") + e.message);
+      toast.error(t("player.add_comment_failed") + e.message);
     }
   };
 
@@ -210,14 +216,14 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       setComments(comments.filter(c => c.id !== id));
       setActiveCommentId(null);
     } catch (e) {
-      alert(t("player.delete_comment_failed") + e.message);
+      toast.error(t("player.delete_comment_failed") + e.message);
     }
   };
 
   if (!video) return null;
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", gap:20, alignItems:"start" }}>
+    <div className="watch-grid" style={{ alignItems:"start" }}>
 
       {/* ── عمود الفيديو ──────────────────────────── */}
       <div>
@@ -269,14 +275,14 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
         <div className="card" style={{ marginBottom:16 }}>
           <h2 style={{ fontSize:18, fontWeight:700, marginBottom:8 }}>{video.title}</h2>
           <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:12 }}>
-            <span style={{ fontSize:12, color:"var(--text-muted)" }}>👁 {video.views_count} {t("player.views_count")}</span>
-            {video.duration && <span style={{ fontSize:12, color:"var(--text-muted)" }}>⏱ {fmtTime(video.duration)}</span>}
-            <span style={{ fontSize:12, color:"var(--text-muted)" }}>📅 {new Date(video.created_at).toLocaleDateString("ar")}</span>
+            <span style={{ fontSize:12, color:"var(--text-muted)", display:"inline-flex", alignItems:"center", gap:4 }}><Eye size={12} /> {video.views_count} {t("player.views_count")}</span>
+            {video.duration && <span style={{ fontSize:12, color:"var(--text-muted)", display:"inline-flex", alignItems:"center", gap:4 }}><Clock size={12} /> {fmtTime(video.duration)}</span>}
+            <span style={{ fontSize:12, color:"var(--text-muted)", display:"inline-flex", alignItems:"center", gap:4 }}><Calendar size={12} /> {new Date(video.created_at).toLocaleDateString("ar")}</span>
           </div>
 
           {/* رابط المشاركة */}
           <div style={{ padding:"10px 14px", background:"var(--bg)", borderRadius:8, border:"1px solid var(--border)", display:"flex", gap:10, alignItems:"center" }}>
-            <span style={{ fontSize:12, color:"var(--text-muted)", flexShrink:0 }}>🔗</span>
+            <Link2 size={13} color="var(--text-muted)" style={{ flexShrink:0 }} />
             <span style={{ fontSize:12, color:"var(--green)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", direction:"ltr", textAlign:"left" }}>
               {window.location.origin}/share/{video.share_token}
             </span>
@@ -293,14 +299,14 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
             onClick={() => setShowAI(!showAI)}
             style={{ width:"100%", display:"flex", justifyContent:"space-between", alignItems:"center", background:"none", border:"none", cursor:"pointer", fontFamily:"inherit", padding:0 }}
           >
-            <span style={{ fontWeight:700, fontSize:15 }}>
-              ✨ {t("player.smart_features")}
+            <span style={{ fontWeight:700, fontSize:15, display:"inline-flex", alignItems:"center", gap:6 }}>
+              <Sparkles size={15} color="var(--purple)" /> {t("player.smart_features")}
             </span>
             <div style={{ display:"flex", gap:6 }}>
               <span style={{ fontSize:10, background:"#34D39920", color:"#34D399", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_translate")}</span>
               <span style={{ fontSize:10, background:"#818CF820", color:"#818CF8", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_summarize")}</span>
               <span style={{ fontSize:10, background:"#C084FC20", color:"#C084FC", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_speakers")}</span>
-              <span style={{ color:"var(--text-muted)", fontSize:14 }}>{showAI ? "▲" : "▼"}</span>
+              <span style={{ color:"var(--text-muted)", display:"flex", alignItems:"center" }}>{showAI ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
             </div>
           </button>
 
@@ -366,7 +372,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
                 </div>
                 {/* Delete button (only for author or video owner) */}
                 {(user && (user.id === c.user_id || user.id === video.owner_id)) && (
-                  <button onClick={() => handleDeleteComment(c.id)} style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", opacity: 0.5, fontSize: 12 }} title={t("player.delete_comment")}>🗑</button>
+                  <button onClick={() => handleDeleteComment(c.id)} style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", opacity: 0.5, display: "flex", padding: 2 }} title={t("player.delete_comment")}><Trash2 size={14} /></button>
                 )}
               </div>
             ))}
@@ -384,11 +390,11 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
           <div style={{ display:"flex", gap:6 }}>
             {status === "done" && !isEditing && (
               <>
-                <button className="btn btn-outline" style={{ padding:"4px 10px", fontSize:11 }} onClick={copyAll}>
-                  {copied ? "✅" : "📋"}
+                <button className="btn btn-outline" style={{ padding:"4px 10px" }} onClick={copyAll} title={t("player.copy")}>
+                  {copied ? <Check size={13} color="var(--green)" /> : <Copy size={13} />}
                 </button>
-                <button className="btn btn-outline" style={{ padding:"4px 10px", fontSize:11 }} onClick={() => setIsEditing(true)}>
-                  ✏️
+                <button className="btn btn-outline" style={{ padding:"4px 10px" }} onClick={() => setIsEditing(true)} title={t("player.save")}>
+                  <Pencil size={13} />
                 </button>
               </>
             )}
@@ -404,7 +410,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
         {/* حالات التفريغ */}
         {(status === "pending" || status === "processing") && (
           <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
-            <div style={{ fontSize:28, marginBottom:12 }}>⚙️</div>
+            <Loader2 size={28} color="var(--green)" className="spin" style={{ marginBottom:12 }} />
             <div style={{ fontWeight:600, marginBottom:6 }}>{status === "pending" ? t("player.pending") : t("player.processing")}</div>
             <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:16 }}>{t("player.auto_appear")}</div>
             <div style={{ display:"flex", gap:4 }}>
@@ -417,11 +423,11 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
 
         {status === "failed" && (
           <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-            <div style={{ fontSize:28, marginBottom:8 }}>❌</div>
+            <AlertCircle size={28} color="var(--red)" style={{ marginBottom:8 }} />
             <div style={{ color:"var(--red)", marginBottom:12, fontSize:13 }}>{t("player.failed")}</div>
             <button className="btn btn-outline" style={{ fontSize:12 }}
               onClick={() => transcriptAPI.retry(video.id).then(fetchTranscript)}>
-              🔄 {t("player.retry")}
+              <RotateCcw size={13} /> {t("player.retry")}
             </button>
           </div>
         )}

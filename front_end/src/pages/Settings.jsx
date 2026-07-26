@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { authAPI } from "../api/client";
 import { useTranslation } from "react-i18next";
 import PasswordInput from "../components/PasswordInput";
+import { UserRound, KeyRound, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 
 const PASSWORD_MIN_CHARS = 8;
 
@@ -101,7 +102,10 @@ export default function Settings() {
 
       {/* معلومات الحساب */}
       <div className="card fade-in" style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>{t("settings.account_info")}</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <UserRound size={16} color="var(--green)" />
+          {t("settings.account_info")}
+        </h2>
 
         <div style={{ marginBottom: 14 }}>
           <label>{t("settings.email")}</label>
@@ -120,7 +124,11 @@ export default function Settings() {
             background: nameMsg.type === "success" ? "#34D39915" : "#F8717115",
             border: `1px solid ${nameMsg.type === "success" ? "#34D39933" : "#F8717133"}`,
             color: nameMsg.type === "success" ? "var(--green)" : "var(--red)",
-          }}>{nameMsg.text}</div>
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            {nameMsg.type === "success" ? <CheckCircle2 size={14} style={{ flexShrink: 0 }} /> : <AlertCircle size={14} style={{ flexShrink: 0 }} />}
+            {nameMsg.text}
+          </div>
         )}
 
         <button className="btn btn-primary" onClick={handleNameSave} disabled={nameLoading}
@@ -131,7 +139,10 @@ export default function Settings() {
 
       {/* تغيير كلمة المرور */}
       <div className="card fade-in" style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>{t("settings.change_password")}</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <KeyRound size={16} color="var(--purple)" />
+          {t("settings.change_password")}
+        </h2>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <PasswordInput
@@ -176,7 +187,11 @@ export default function Settings() {
               background: pwdMsg.type === "success" ? "#34D39915" : "#F8717115",
               border: `1px solid ${pwdMsg.type === "success" ? "#34D39933" : "#F8717133"}`,
               color: pwdMsg.type === "success" ? "var(--green)" : "var(--red)",
-            }}>{pwdMsg.text}</div>
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              {pwdMsg.type === "success" ? <CheckCircle2 size={14} style={{ flexShrink: 0 }} /> : <AlertCircle size={14} style={{ flexShrink: 0 }} />}
+              {pwdMsg.text}
+            </div>
           )}
 
           <button className="btn btn-primary" onClick={handlePasswordChange} disabled={pwdLoading}
@@ -188,7 +203,8 @@ export default function Settings() {
 
       {/* رابط العودة */}
       <div style={{ textAlign: "center" }}>
-        <Link to="/dashboard" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none" }}>
+        <Link to="/dashboard" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <ArrowRight size={14} />
           {t("settings.back_to_dashboard")}
         </Link>
       </div>

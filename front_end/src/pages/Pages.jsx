@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Recorder from "../components/Recorder";
+import { VideoOff, Lock, AlertTriangle, ArrowRight, Settings2 } from "lucide-react";
 
 export function RecordPage() {
   const navigate = useNavigate();
@@ -80,7 +81,9 @@ export function WatchPage() {
 
   if (error) return (
     <div style={{ textAlign: "center", padding: "80px 20px" }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <VideoOff size={44} color="var(--red)" />
+      </div>
       <h2 style={{ marginBottom: 8 }}>{t("pages.video_not_found")}</h2>
       <p style={{ color: "var(--text-muted)", marginBottom: 20 }}>{error}</p>
       <Link to="/dashboard" className="btn btn-outline">{t("pages.back_to_dashboard")}</Link>
@@ -94,10 +97,12 @@ export function WatchPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <Link to="/dashboard" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <ArrowRight size={14} />
           {t("pages.back")}
         </Link>
         {isOwner && (
-          <button className="btn btn-outline" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => setShowSettings(!showSettings)}>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowSettings(!showSettings)}>
+            <Settings2 size={13} />
             {t("pages.protected_share_settings")}
           </button>
         )}
@@ -196,7 +201,13 @@ export function SharePage() {
 
   if (needsPassword) return (
     <div style={{ maxWidth: 400, margin: "80px auto", padding: "40px 20px", textAlign: "center" }} className="card fade-in">
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+      <div style={{
+        width: 64, height: 64, borderRadius: 18, margin: "0 auto 16px",
+        background: "rgba(192,132,252,0.1)", border: "1px solid rgba(192,132,252,0.25)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Lock size={26} color="var(--purple)" />
+      </div>
       <h2 style={{ marginBottom: 12 }}>{t("pages.share_password_title")}</h2>
       <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>{t("pages.share_password_desc")}</p>
       
@@ -219,7 +230,9 @@ export function SharePage() {
 
   if (error) return (
     <div style={{ textAlign: "center", padding: "80px 20px" }}>
-      <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <AlertTriangle size={40} color="#FCD34D" />
+      </div>
       <h2>{t("pages.share_not_available")}</h2>
       <p style={{ color: "var(--text-muted)" }}>{error}</p>
     </div>

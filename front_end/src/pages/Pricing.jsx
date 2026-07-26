@@ -5,6 +5,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useTranslation } from "react-i18next";
+import { paymentsAPI } from "../api/client";
+import { useToast } from "../components/ui/Toast";
+import { Check, AlertCircle } from "lucide-react";
 
 export default function Pricing() {
   const { t } = useTranslation();
@@ -12,6 +15,7 @@ export default function Pricing() {
   const [error,   setError]   = useState("");
   const { user }              = useAuth();
   const navigate              = useNavigate();
+  const toast                 = useToast();
 
   const PLANS = [
     {
@@ -37,25 +41,13 @@ export default function Pricing() {
     setError("");
 
     try {
-      const token = localStorage.getItem("sawa_token");
-      const res = await fetch("/api/payments/create", {
-        method: "POST",
-        headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
-        body: JSON.stringify({ plan: planId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || t("pricing.payment_failed"));
+      const data = await paymentsAPI.create(planId);
 
       if (data.mode === "development") {
         // وضع التطوير — فعّل تجريبياً
-        const demoRes = await fetch(`/api/payments/demo-activate/${planId}`, {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${token}` },
-        });
-        if (demoRes.ok) {
-          alert(t("pricing.demo_activated", { plan: planId }));
-          navigate("/dashboard");
-        }
+        await paymentsAPI.demo(planId);
+        toast.success(t("pricing.demo_activated", { plan: planId }));
+        navigate("/dashboard");
       } else {
         // وجّه المستخدم لبوابة الدفع
         window.location.href = data.payment_url;
@@ -100,8 +92,8 @@ export default function Pricing() {
               {p.price > 0 && <span style={{ fontSize:13, color:"var(--text-muted)" }}>{t("pricing.per_month")}</span>}
             </div>
             {p.features.map(f => (
-              <div key={f} style={{ display:"flex", gap:8, marginBottom:8 }}>
-                <span style={{ color:p.color }}>✓</span>
+              <div key={f} style={{ display:"flex", gap:8, marginBottom:8, alignItems:"flex-start" }}>
+                <Check size={15} color={p.color} strokeWidth={3} style={{ flexShrink:0, marginTop:2 }} />
                 <span style={{ fontSize:13 }}>{f}</span>
               </div>
             ))}
@@ -125,7 +117,8 @@ export default function Pricing() {
       </div>
 
       {error && (
-        <div style={{ padding:"12px 16px", background:"#F8717115", border:"1px solid #F8717133", borderRadius:10, color:"var(--red)", fontSize:13, textAlign:"center" }}>
+        <div style={{ padding:"12px 16px", background:"#F8717115", border:"1px solid #F8717133", borderRadius:10, color:"var(--red)", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+          <AlertCircle size={15} style={{ flexShrink:0 }} />
           {error}
         </div>
       )}
