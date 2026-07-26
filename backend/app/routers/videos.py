@@ -465,18 +465,6 @@ def stream_video_by_share_token(
 
 
 # ══════════════════════════════════════════════════════
-#  GET /api/videos/file/{path:path}  (local file serving)
-# ══════════════════════════════════════════════════════
-@router.get("/file/{file_path:path}")
-def serve_local_file(file_path: str):
-    store = storage()
-    local = store.get_local_path(file_path)
-    if local:
-        return FileResponse(local)
-    raise HTTPException(404, "الملف غير موجود")
-
-
-# ══════════════════════════════════════════════════════
 #  PATCH /api/videos/{id}/share-settings
 # ══════════════════════════════════════════════════════
 @router.patch("/{video_id}/share-settings")

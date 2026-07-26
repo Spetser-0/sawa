@@ -46,7 +46,11 @@ class LocalStorage(StorageBackend):
         os.makedirs(base_dir, exist_ok=True)
 
     def _full_path(self, key: str) -> str:
-        return os.path.join(self.base_dir, key)
+        path = (Path(self.base_dir) / key).resolve()
+        base = Path(self.base_dir).resolve()
+        if not str(path).startswith(str(base) + os.sep) and str(path) != str(base):
+            raise ValueError(f"Path traversal attempt blocked: {key}")
+        return str(path)
 
     def put(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         path = self._full_path(key)
