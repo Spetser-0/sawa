@@ -166,7 +166,8 @@
     "error_cancelled": "Cancelled",
     "error_drive_download": "Failed to download file from Google Drive",
     "drive_picker_title": "Choose a video from Google Drive",
-    "mic_unavailable": "Microphone unavailable — screen audio only"
+    "mic_unavailable": "Microphone unavailable — screen audio only",
+    "switch_camera": "Switch camera"
   },
   "dashboard": {
     "title": "My Recordings",

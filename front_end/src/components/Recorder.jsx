@@ -2,12 +2,12 @@
  * مكوّن تسجيل الشاشة — قلب مشروع سوى
  * يدعم: تسجيل الشاشة، الكاميرا، رفع ملفات، استيراد من Google Drive
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { videosAPI } from "../api/client";
 import {
   FolderOpen, Cloud, Video, Camera, CheckCircle2,
-  UploadCloud, MicOff, Pause, Play, Square, AlertCircle,
+  UploadCloud, MicOff, Pause, Play, Square, AlertCircle, RotateCw,
 } from "lucide-react";
 
 const LANGUAGES = [
@@ -45,12 +45,14 @@ export default function Recorder({ onUploadDone }) {
   const [error, setError]       = useState("");
   const [videoId, setVideoId]   = useState(null);
   const [noiseReduction, setNoiseReduction] = useState(false);
+  const [facingMode, setFacingMode] = useState("user");
 
   const mediaRecorderRef = useRef(null);
   const chunksRef        = useRef([]);
   const streamRef        = useRef(null);
   const timerRef         = useRef(null);
   const previewRef       = useRef(null);
+  const previewStreamRef = useRef(null);
   const fileInputRef     = useRef(null);
 
   const uploadFile = useCallback(async (file, uploadMode) => {
@@ -193,12 +195,18 @@ export default function Recorder({ onUploadDone }) {
 
   const startRecording = useCallback(async () => {
     setError("");
+
+    if (previewStreamRef.current) {
+      previewStreamRef.current.getTracks().forEach((t) => t.stop());
+      previewStreamRef.current = null;
+    }
+
     try {
       let combinedStream;
 
       if (mode === "camera" || isMobile) {
         const camStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: true,
         });
         combinedStream = camStream;
@@ -278,7 +286,7 @@ export default function Recorder({ onUploadDone }) {
         setError(`خطأ: ${err.message}`);
       }
     }
-  }, [mode]);
+  }, [mode, facingMode]);
 
   const togglePause = () => {
     const rec = mediaRecorderRef.current;
@@ -333,6 +341,36 @@ export default function Recorder({ onUploadDone }) {
     const sec = (s % 60).toString().padStart(2, "0");
     return `${m}:${sec}`;
   };
+
+  const switchCamera = useCallback(() => {
+    setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+  }, []);
+
+  useEffect(() => {
+    if (state !== "idle" || mode !== "camera") return;
+
+    let cancelled = false;
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    }).then((stream) => {
+      if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+      previewStreamRef.current = stream;
+      if (previewRef.current) {
+        previewRef.current.srcObject = stream;
+        previewRef.current.play().catch(() => {});
+      }
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (previewStreamRef.current) {
+        previewStreamRef.current.getTracks().forEach((t) => t.stop());
+        previewStreamRef.current = null;
+      }
+    };
+  }, [state, mode, facingMode]);
 
   const tabStyle = (active) => ({
     flex: 1,
@@ -410,17 +448,43 @@ export default function Recorder({ onUploadDone }) {
             </div>
           )}
 
-          {!isMobile && (
-            <div style={{ display: "flex", background: "var(--bg)", borderRadius: 10, padding: 4, marginBottom: 16 }}>
+          {state === "idle" && mode === "camera" && (
+            <div style={{ position: "relative", marginBottom: 16, borderRadius: 14, overflow: "hidden", background: "#000" }}>
+              <video
+                ref={previewRef}
+                muted
+                autoPlay
+                playsInline
+                style={{ width: "100%", maxHeight: 200, display: "block", objectFit: "cover" }}
+              />
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={switchCamera}
+                  aria-label={t("recorder.switch_camera")}
+                  style={{
+                    position: "absolute", bottom: 10, right: 10,
+                    width: 40, height: 40, borderRadius: "50%",
+                    background: "#000000aa", border: "none",
+                    color: "#fff", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <RotateCw size={18} />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: "flex", background: "var(--bg)", borderRadius: 10, padding: 4, marginBottom: 16 }}>
               {[["screen", t("recorder.screen_recording")], ["camera", t("recorder.camera")], ["file", t("recorder.from_files")]].map(([m, label]) => (
                 <button key={m} onClick={() => setMode(m)} style={tabStyle(mode === m)}>
                   {label}
                 </button>
               ))}
             </div>
-          )}
 
-          {mode === "file" && !isMobile && (
+          {mode === "file" && (
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
                 {t("recorder.file_desc")}

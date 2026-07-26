@@ -166,7 +166,8 @@
     "error_cancelled": "تم الإلغاء",
     "error_drive_download": "فشل تحميل الملف من Google Drive",
     "drive_picker_title": "اختر فيديو من Google Drive",
-    "mic_unavailable": "الميكروفون غير متاح — سيُسجَّل الصوت من الشاشة فقط"
+    "mic_unavailable": "الميكروفون غير متاح — سيُسجَّل الصوت من الشاشة فقط",
+    "switch_camera": "تبديل الكاميرا"
   },
   "dashboard": {
     "title": "تسجيلاتي",

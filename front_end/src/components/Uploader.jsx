@@ -283,7 +283,6 @@ export default function Uploader({ onSuccess }) {
             ref={fileInputRef}
             type="file"
             accept="video/*,audio/*"
-            capture={isMobile ? "environment" : undefined}
             className="uploader-file-input"
             onChange={handleInputChange}
           />
