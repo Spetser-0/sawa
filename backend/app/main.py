@@ -48,7 +48,6 @@ def _log_storage_config():
     r2_endpoint = os.environ.get("R2_ENDPOINT", "")
     r2_key_id = os.environ.get("R2_ACCESS_KEY_ID", "")
     r2_secret = os.environ.get("R2_SECRET_ACCESS_KEY", "")
-    r2_public = os.environ.get("R2_PUBLIC_URL", "")
 
     if r2_bucket:
         missing = []
@@ -63,7 +62,7 @@ def _log_storage_config():
                          "R2Storage.__init__ will raise KeyError on startup!")
         else:
             logger.info(f"✅ R2 configured: bucket={r2_bucket}, endpoint={r2_endpoint[:40]}..., "
-                        f"public_url={r2_public or '(none)'}")
+                        f"presigned-only mode")
     else:
         logger.info(f"ℹ️  R2_BUCKET_NAME not set — using local storage: {settings.UPLOAD_DIR}")
 

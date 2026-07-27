@@ -25,7 +25,7 @@ class StorageBackend(ABC):
 
     @abstractmethod
     def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
-        """أعد presigned URL للقراءة. إذا كان is_public=False، استخدم presigned URL حتى لو كان public_url متاحاً."""
+        """أعد presigned URL للقراءة مع انتهاء صلاحية. لا تستخدم روابط عامة دائمة."""
         ...
 
     @abstractmethod
@@ -88,7 +88,6 @@ class R2Storage(StorageBackend):
     def __init__(self):
         import boto3
         self.bucket = os.environ["R2_BUCKET_NAME"]
-        self.public_url = os.environ.get("R2_PUBLIC_URL", "")
         self.client = boto3.client(
             "s3",
             endpoint_url=os.environ["R2_ENDPOINT"],
@@ -116,10 +115,12 @@ class R2Storage(StorageBackend):
         return {"url": url, "fields": {"Content-Type": content_type}}
 
     def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
+        """Always generate a presigned URL with expiration.
+        Never use permanent public URLs — even for public videos — because
+        the R2 bucket has Public Access enabled and raw URLs bypass all
+        application-level auth/ownership checks."""
         if not key:
             return None
-        if self.public_url and is_public:
-            return f"{self.public_url}/{key}"
         return self.client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.bucket, "Key": key},

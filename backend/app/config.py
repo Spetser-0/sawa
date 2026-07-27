@@ -65,7 +65,6 @@ class Settings(BaseSettings):
     R2_ENDPOINT: Optional[str] = None
     R2_ACCESS_KEY_ID: Optional[str] = None
     R2_SECRET_ACCESS_KEY: Optional[str] = None
-    R2_PUBLIC_URL: Optional[str] = None
 
     class Config:
         env_file = ".env"
