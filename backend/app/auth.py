@@ -71,6 +71,8 @@ def decode_token(token: str) -> Optional[dict]:
         payload = jwt.decode(token, settings.SECRET_KEY,
                              algorithms=[settings.ALGORITHM])
         return payload
+    except jwt.ExpiredSignatureError:
+        return None
     except JWTError:
         return None
 

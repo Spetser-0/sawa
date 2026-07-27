@@ -19,6 +19,11 @@ class StorageBackend(ABC):
         ...
 
     @abstractmethod
+    def put_streaming(self, key: str, file_obj, content_type: str = "application/octet-stream") -> str:
+        """ارفع ملف من file-like object بدون تحميله بالكامل في الذاكرة."""
+        ...
+
+    @abstractmethod
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
         """أعد presigned URL + fields للرفع المباشر من المتصفح."""
         ...
@@ -63,6 +68,14 @@ class LocalStorage(StorageBackend):
             f.write(data)
         return key
 
+    def put_streaming(self, key: str, file_obj, content_type: str = "application/octet-stream") -> str:
+        path = self._full_path(key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            while chunk := file_obj.read(1024 * 1024):
+                f.write(chunk)
+        return key
+
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
         return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
 
@@ -103,6 +116,13 @@ class R2Storage(StorageBackend):
 
     def put(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         self.client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=content_type)
+        return key
+
+    def put_streaming(self, key: str, file_obj, content_type: str = "application/octet-stream") -> str:
+        """Upload via multipart-like streaming to avoid loading entire file into memory."""
+        from boto3.s3.transfer import TransferConfig
+        config = TransferConfig(multipart_threshold=8 * 1024 * 1024, multipart_chunksize=8 * 1024 * 1024)
+        self.client.upload_fileobj(file_obj, self.bucket, key, ExtraArgs={"ContentType": content_type}, Config=config)
         return key
 
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:

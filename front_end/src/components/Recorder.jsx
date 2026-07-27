@@ -261,7 +261,11 @@ export default function Recorder({ onUploadDone }) {
       const recorder = new MediaRecorder(combinedStream, {
         mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
           ? "video/webm;codecs=vp9"
-          : "video/webm",
+          : MediaRecorder.isTypeSupported("video/mp4;codecs=h264,aac")
+            ? "video/mp4;codecs=h264,aac"
+            : MediaRecorder.isTypeSupported("video/mp4")
+              ? "video/mp4"
+              : "video/webm",
       });
 
       chunksRef.current = [];
@@ -313,9 +317,11 @@ export default function Recorder({ onUploadDone }) {
     setState("uploading");
     setProgress(0);
 
-    const blob = new Blob(chunksRef.current, { type: "video/webm" });
-    const file = new File([blob], `${title || "تسجيل"}-${Date.now()}.webm`, {
-      type: "video/webm",
+    const mimeType = mediaRecorderRef.current?.mimeType || "video/webm";
+    const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+    const blob = new Blob(chunksRef.current, { type: mimeType });
+    const file = new File([blob], `${title || "تسجيل"}-${Date.now()}.${ext}`, {
+      type: mimeType,
     });
 
     try {
@@ -493,7 +499,8 @@ export default function Recorder({ onUploadDone }) {
                 ref={fileInputRef}
                 type="file"
                 accept="video/*,audio/*"
-                style={{ display: "none" }}
+                aria-hidden="true"
+                style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap" }}
                 onChange={handleFileSelect}
               />
               <button

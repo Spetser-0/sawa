@@ -170,10 +170,10 @@ def translate_transcript(
             "source_lang":  "ar",
             "target_lang":  "en",
         }
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"فشلت الترجمة: {str(e)}")
+    except ValueError:
+        raise HTTPException(400, "فشلت الترجمة — تحقق من إعدادات الذكاء الاصطناعي")
+    except Exception:
+        raise HTTPException(500, "فشلت الترجمة")
 
 
 # ══════════════════════════════════════════════════════
@@ -202,10 +202,10 @@ def summarize_transcript_route(
         transcript.summary = json.dumps(result, ensure_ascii=False)
         db.commit()
         return result
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"فشل التلخيص: {str(e)}")
+    except ValueError:
+        raise HTTPException(400, "فشل التلخيص — تحقق من إعدادات الذكاء الاصطناعي")
+    except Exception:
+        raise HTTPException(500, "فشل التلخيص")
 
 
 # ══════════════════════════════════════════════════════
@@ -242,10 +242,10 @@ def diarize_transcript(
             "speakers_found":  len(set(s["speaker"] for s in speakers)),
             "segments":        merged,
         }
-    except (ImportError, ValueError) as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"فشل تحديد المتحدثين: {str(e)}")
+    except (ImportError, ValueError):
+        raise HTTPException(400, "تحديد المتحدثين غير متاح حالياً")
+    except Exception:
+        raise HTTPException(500, "فشل تحديد المتحدثين")
 
 
 # ══════════════════════════════════════════════════════
@@ -312,8 +312,8 @@ def generate_chapters(
 
     except json.JSONDecodeError:
         raise HTTPException(500, "فشل تحليل استجابة الذكاء الاصطناعي")
-    except Exception as e:
-        raise HTTPException(500, f"فشل إنشاء الفصول: {str(e)}")
+    except Exception:
+        raise HTTPException(500, "فشل إنشاء الفصول")
 
 
 # ══════════════════════════════════════════════════════

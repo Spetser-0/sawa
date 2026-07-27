@@ -3,6 +3,8 @@
 """
 import os
 import uuid
+import struct
+import logging
 from pathlib import Path
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
@@ -11,6 +13,7 @@ import aiofiles
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel
 from app.limiter import limiter
 
@@ -20,6 +23,8 @@ from app.auth import get_current_user, require_auth, hash_password, verify_passw
 from app.config import settings
 from app.transcription import transcribe_audio, extract_audio_if_needed, denoise_audio
 from app.storage import storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -33,6 +38,46 @@ def _is_truly_public(video: Video) -> bool:
     if video.share_expires_at and video.share_expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         return False
     return True
+
+
+# ── Magic bytes validation ─────────────────────────────
+MAGIC_SIGNATURES = {
+    b"\x1a\x45\xdf\xa3": "webm",
+    b"\x00\x00\x00\x1c": "mp4",
+    b"\x00\x00\x00\x20": "mp4",
+    b"\x00\x00\x00\x18": "mp4",
+    b"\x00\x00\x00\x14": "mp4",
+    b"\x52\x49\x46\x46": "avi",
+    b"\x1a\x45\xdf\xa3": "mkv",
+    b"\x49\x44\x33":      "mp3",
+    b"\xff\xfb":          "mp3",
+    b"\xff\xf3":          "mp3",
+    b"\xff\xf2":          "mp3",
+    b"\x52\x49\x46\x46":  "wav",
+    b"\x66\x4c\x61\x43":  "flac",
+    b"\x4f\x67\x67\x53":  "ogg",
+    b"\x00\x00\x00\x0c":  "m4a",
+}
+
+ALLOWED_EXTENSIONS = {
+    "mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac"
+}
+
+
+def _validate_file_magic(file_path: str, declared_ext: str) -> bool:
+    """Check file header bytes against declared extension."""
+    try:
+        with open(file_path, "rb") as f:
+            header = f.read(16)
+        if len(header) < 4:
+            return False
+        file_magic = header[:4]
+        for sig, fmt in MAGIC_SIGNATURES.items():
+            if file_magic == sig:
+                return fmt == declared_ext or declared_ext in ("mov", "mkv")
+        return True  # unknown magic — allow if extension was already checked
+    except Exception:
+        return False
 
 
 # ── Schemas ───────────────────────────────────────────
@@ -188,18 +233,26 @@ async def upload_video(
     current_user: User         = Depends(require_auth),
 ):
     ext = Path(file.filename).suffix.lower().lstrip(".")
-    if ext not in settings.ALLOWED_EXTENSIONS:
+    if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"نوع الملف غير مدعوم. الأنواع المقبولة: {', '.join(settings.ALLOWED_EXTENSIONS)}",
+            detail=f"نوع الملف غير مدعوم. الأنواع المقبولة: {', '.join(ALLOWED_EXTENSIONS)}",
         )
 
-    video_count = db.query(Video).filter(Video.owner_id == current_user.id).count()
-    if current_user.plan == "free" and video_count >= settings.FREE_MAX_VIDEOS:
-        raise HTTPException(
-            status_code=403,
-            detail=f"وصلت للحد الأقصى ({settings.FREE_MAX_VIDEOS} تسجيل) في الخطة المجانية. يرجى الترقية.",
-        )
+    # ── Prevent race condition with SELECT FOR UPDATE ──
+    user_row = db.execute(
+        text("SELECT plan FROM users WHERE id = :uid FOR UPDATE"),
+        {"uid": current_user.id},
+    ).fetchone()
+    user_plan = user_row[0] if user_row else current_user.plan
+
+    if user_plan == "free":
+        video_count = db.query(Video).filter(Video.owner_id == current_user.id).count()
+        if video_count >= settings.FREE_MAX_VIDEOS:
+            raise HTTPException(
+                status_code=403,
+                detail=f"وصلت للحد الأقصى ({settings.FREE_MAX_VIDEOS} تسجيل) في الخطة المجانية. يرجى الترقية.",
+            )
 
     video_id  = str(uuid.uuid4())
     filename  = f"{video_id}.{ext}"
@@ -233,14 +286,23 @@ async def upload_video(
 
     file_size = total_bytes
 
-    # ── ارفع إلى R2 ──
+    # ── Validate magic bytes ──
+    if not _validate_file_magic(tmp_path, ext):
+        os.remove(tmp_path)
+        raise HTTPException(
+            status_code=400,
+            detail="محتوى الملف لا يتوافق مع الامتداد المُصرّح",
+        )
+
+    # ── ارفع إلى R2 (streaming) ──
     if use_r2:
         try:
             with open(tmp_path, "rb") as f:
-                store.put(r2_key, f.read(), file.content_type or "application/octet-stream")
+                store.put_streaming(r2_key, f, file.content_type or "application/octet-stream")
         except Exception as e:
             logger.error(f"R2 upload failed: {e}")
-            os.remove(tmp_path)
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
             raise HTTPException(status_code=500, detail="فشل رفع الملف إلى التخزين السحابي")
 
     video = Video(
@@ -360,15 +422,53 @@ def _run_thumbnail_generation(video_id: str, file_path: str, r2_key: str = None)
 # ══════════════════════════════════════════════════════
 @router.post("/presigned-upload")
 def get_presigned_upload(
-    filename:   str,
+    request:      Request,
+    filename:     str,
     content_type: str = "video/webm",
+    title:        str = "تسجيل جديد",
+    dialect:      str = "ar",
+    db:           Session = Depends(get_db),
     current_user: User = Depends(require_auth),
 ):
-    """يُعطي رابط رفع مباشر للمتصفح (لـ R2)."""
+    """يُعطي رابط رفع مباشر للمتصفح (لـ R2) مع التحقق من الخطة."""
+    # ── Enforce plan limits (SELECT FOR UPDATE) ──
+    user_row = db.execute(
+        text("SELECT plan FROM users WHERE id = :uid FOR UPDATE"),
+        {"uid": current_user.id},
+    ).fetchone()
+    user_plan = user_row[0] if user_row else current_user.plan
+
+    if user_plan == "free":
+        video_count = db.query(Video).filter(Video.owner_id == current_user.id).count()
+        if video_count >= settings.FREE_MAX_VIDEOS:
+            raise HTTPException(
+                status_code=403,
+                detail=f"وصلت للحد الأقصى ({settings.FREE_MAX_VIDEOS} تسجيل) في الخطة المجانية.",
+            )
+
+    ext = Path(filename).suffix.lower().lstrip(".")
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="نوع الملف غير مدعوم")
+
+    video_id = str(uuid.uuid4())
+    r2_key = f"users/{current_user.id}/videos/{video_id}/{video_id}.{ext}"
+
+    # ── Create pending video record ──
+    video = Video(
+        id=video_id,
+        title=title,
+        file_path=r2_key,
+        dialect=dialect,
+        owner_id=current_user.id,
+    )
+    db.add(video)
+    transcript = Transcript(video_id=video_id)
+    db.add(transcript)
+    db.commit()
+
     store = storage()
-    key = f"uploads/{current_user.id}/{uuid.uuid4().hex}/{filename}"
-    result = store.get_presigned_upload_url(key, content_type)
-    return {"key": key, **result}
+    result = store.get_presigned_upload_url(r2_key, content_type)
+    return {"key": r2_key, "video_id": video_id, **result}
 
 
 # ══════════════════════════════════════════════════════
@@ -385,11 +485,15 @@ def get_my_videos(
         .order_by(Video.created_at.desc())
         .all()
     )
+    store = storage()
     result = []
     for v in videos:
         r = VideoResponse.model_validate(v)
         r.transcript_status = v.transcript.status if v.transcript else None
-        r.thumbnail_url = storage().get_presigned_read_url(v.thumbnail_path, is_public=_is_truly_public(v)) if v.thumbnail_path else None
+        if v.thumbnail_path:
+            r.thumbnail_url = store.get_presigned_read_url(
+                v.thumbnail_path, is_public=_is_truly_public(v)
+            )
         result.append(r)
     return result
 
@@ -617,6 +721,10 @@ def get_hls_playlist(
     if not video:
         raise HTTPException(404, "الفيديو غير موجود")
 
+    if not video.is_public:
+        if not current_user or video.owner_id != current_user.id:
+            raise HTTPException(403, "ليس لديك صلاحية لمشاهدة هذا الفيديو")
+
     if not video.hls_ready or not video.hls_playlist_path:
         raise HTTPException(404, "HLS غير جاهز بعد")
 
@@ -691,6 +799,25 @@ def delete_video(
         storage().delete(video.file_path)
     except Exception:
         pass
+
+    # ── احذف HLS ──
+    if video.hls_playlist_path:
+        try:
+            store = storage()
+            hls_prefix = f"hls/{video_id}"
+            if hasattr(store, "client") and hasattr(store, "bucket"):
+                import boto3
+                paginator = store.client.get_paginator("list_objects_v2")
+                for page in paginator.paginate(Bucket=store.bucket, Prefix=hls_prefix):
+                    for obj in page.get("Contents", []):
+                        store.client.delete_object(Bucket=store.bucket, Key=obj["Key"])
+            else:
+                import shutil
+                local_hls = Path("hls") / video_id
+                if local_hls.exists():
+                    shutil.rmtree(local_hls, ignore_errors=True)
+        except Exception:
+            pass
 
     # ── احذف الصورة المصغرة ──
     if video.thumbnail_path:
