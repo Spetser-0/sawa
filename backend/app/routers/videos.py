@@ -513,9 +513,10 @@ def update_share_settings(
 @router.post("/share/{token}/unlock")
 @limiter.limit("5/minute")
 def unlock_shared_video(
-    token: str,
-    data:  UnlockShareRequest,
-    db:    Session = Depends(get_db),
+    request: Request,
+    token:   str,
+    data:    UnlockShareRequest,
+    db:      Session = Depends(get_db),
 ):
     video = db.query(Video).filter(Video.share_token == token).first()
     if not video:
