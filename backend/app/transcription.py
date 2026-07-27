@@ -1,6 +1,6 @@
 """
 خدمة التفريغ الصوتي بالذكاء الاصطناعي
-Gemini (رئيسي) → Groq (بديل) → faster-whisper (محلي)
+Gemini (رئيسي) → Groq (بديل)
 """
 import time
 import json
@@ -194,82 +194,6 @@ def transcribe_with_groq(file_path: str, language: str = "ar") -> dict:
 
 
 # ══════════════════════════════════════════════════════
-#  faster-whisper (المحلي — كخيار أخير)
-# ══════════════════════════════════════════════════════
-_whisper_model = None
-
-def get_whisper_model():
-    global _whisper_model
-    if _whisper_model is None:
-        logger.info(f"⏳ تحميل نموذج Whisper ({settings.WHISPER_MODEL})...")
-        try:
-            from faster_whisper import WhisperModel
-            _whisper_model = WhisperModel(
-                settings.WHISPER_MODEL,
-                device=settings.WHISPER_DEVICE,
-                compute_type=settings.WHISPER_COMPUTE_TYPE,
-            )
-            logger.info("✅ تم تحميل نموذج Whisper بنجاح")
-        except ImportError:
-            logger.error("❌ faster-whisper غير مثبت.")
-            raise
-    return _whisper_model
-
-
-def transcribe_with_local_whisper(file_path: str, language: str = "ar") -> dict:
-    model    = get_whisper_model()
-    start_ts = time.time()
-    base_lang = language.split("-")[0] if "-" in language else language
-
-    logger.info(f"🎙️ [Local Whisper] بدء تفريغ: {file_path} (language={base_lang})")
-
-    segments_iter, info = model.transcribe(
-        file_path,
-        language=base_lang,
-        beam_size=5,
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500),
-        word_timestamps=True,
-    )
-
-    segments   = []
-    full_parts = []
-
-    for seg in segments_iter:
-        text = seg.text.strip()
-        if not text:
-            continue
-
-        segment_data = {
-            "start": round(seg.start, 2),
-            "end":   round(seg.end,   2),
-            "text":  text,
-        }
-
-        if seg.words:
-            segment_data["words"] = [
-                {"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)}
-                for w in seg.words
-            ]
-
-        segments.append(segment_data)
-        full_parts.append(text)
-
-    processing_time = round(time.time() - start_ts, 2)
-
-    logger.info(f"✅ [Local Whisper] اكتمل في {processing_time}s — {len(segments)} مقطع")
-
-    return {
-        "full_text":         " ".join(full_parts),
-        "segments":          segments,
-        "language_detected": info.language,
-        "language_prob":     round(info.language_probability, 3),
-        "processing_time":   processing_time,
-        "segments_count":    len(segments),
-    }
-
-
-# ══════════════════════════════════════════════════════
 #  الدالة الرئيسية — سلسلة التخفيض (Fallback Chain)
 # ══════════════════════════════════════════════════════
 def transcribe_audio(
@@ -281,7 +205,6 @@ def transcribe_audio(
     تفرّغ ملف صوتي أو فيديو — يجرّب المزودات بالترتيب:
     1. Gemini (الرئيسي)
     2. Groq (بديل)
-    3. faster-whisper (محلي)
     """
     if not Path(file_path).exists():
         raise FileNotFoundError(f"الملف غير موجود: {file_path}")
@@ -293,17 +216,14 @@ def transcribe_audio(
         providers = [
             ("gemini", transcribe_with_gemini),
             ("groq", transcribe_with_groq),
-            ("local", transcribe_with_local_whisper),
         ]
     elif provider == "groq":
         providers = [
             ("groq", transcribe_with_groq),
             ("gemini", transcribe_with_gemini),
-            ("local", transcribe_with_local_whisper),
         ]
     else:
         providers = [
-            ("local", transcribe_with_local_whisper),
             ("gemini", transcribe_with_gemini),
             ("groq", transcribe_with_groq),
         ]

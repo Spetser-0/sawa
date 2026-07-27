@@ -7,7 +7,6 @@ pydantic[email]
 pydantic-settings
 python-jose[cryptography]
 bcrypt
-faster-whisper
 numpy
 aiofiles
 python-docx
