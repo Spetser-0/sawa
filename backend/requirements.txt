@@ -10,7 +10,6 @@ bcrypt
 faster-whisper
 numpy
 aiofiles
-anthropic
 python-docx
 httpx
 psycopg2-binary

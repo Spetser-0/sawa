@@ -3,17 +3,18 @@
 """
 import json
 import os
-import anthropic
+import google.generativeai as genai
 import logging
 
 logger = logging.getLogger(__name__)
 
-# ── Claude Client ────────────────────────────────────
-def get_claude():
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+# ── Gemini Client ────────────────────────────────────
+def get_gemini():
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY غير موجود في ملف .env")
-    return anthropic.Anthropic(api_key=api_key)
+        raise ValueError("GEMINI_API_KEY غير موجود في ملف .env")
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel("gemini-2.0-flash")
 
 
 # ══════════════════════════════════════════════════════
@@ -23,7 +24,7 @@ def translate_to_english(arabic_text: str, segments: list = None) -> dict:
     """
     يترجم النص العربي للإنجليزية مع الحفاظ على الطوابع الزمنية
     """
-    client = get_claude()
+    model = get_gemini()
 
     if segments:
         # ترجمة الجمل مع الحفاظ على التوقيت
@@ -43,13 +44,9 @@ def translate_to_english(arabic_text: str, segments: list = None) -> dict:
 النص:
 {arabic_text}"""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    response = model.generate_content(prompt)
 
-    raw = message.content[0].text.strip()
+    raw = response.text.strip()
     # نظّف الـ JSON إذا جاء بـ backticks
     raw = raw.replace("```json", "").replace("```", "").strip()
 
@@ -67,7 +64,7 @@ def summarize_transcript(full_text: str, language: str = "ar") -> dict:
     """
     يُلخّص النص المفرَّغ في نقاط رئيسية
     """
-    client = get_claude()
+    model = get_gemini()
 
     lang_instruction = "باللغة العربية" if language == "ar" else "in English"
 
@@ -86,13 +83,9 @@ def summarize_transcript(full_text: str, language: str = "ar") -> dict:
 النص:
 {full_text[:8000]}"""  # حد 8000 حرف لتجنب تجاوز الـ context
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    response = model.generate_content(prompt)
 
-    raw = message.content[0].text.strip()
+    raw = response.text.strip()
     raw = raw.replace("```json", "").replace("```", "").strip()
 
     try:
