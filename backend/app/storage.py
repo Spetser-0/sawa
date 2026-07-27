@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Optional
 from abc import ABC, abstractmethod
 
+from fastapi import HTTPException
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,8 +24,8 @@ class StorageBackend(ABC):
         ...
 
     @abstractmethod
-    def get_presigned_read_url(self, key: str, expires: int = 3600) -> str:
-        """أعد presigned URL للقراءة."""
+    def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
+        """أعد presigned URL للقراءة. إذا كان is_public=False، استخدم presigned URL حتى لو كان public_url متاحاً."""
         ...
 
     @abstractmethod
@@ -46,10 +48,12 @@ class LocalStorage(StorageBackend):
         os.makedirs(base_dir, exist_ok=True)
 
     def _full_path(self, key: str) -> str:
+        if "\x00" in key:
+            raise HTTPException(status_code=400, detail="Invalid file path")
         path = (Path(self.base_dir) / key).resolve()
         base = Path(self.base_dir).resolve()
-        if not str(path).startswith(str(base) + os.sep) and str(path) != str(base):
-            raise ValueError(f"Path traversal attempt blocked: {key}")
+        if not path.is_relative_to(base):
+            raise HTTPException(status_code=400, detail="Invalid file path")
         return str(path)
 
     def put(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
@@ -62,8 +66,8 @@ class LocalStorage(StorageBackend):
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
         return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
 
-    def get_presigned_read_url(self, key: str, expires: int = 3600) -> str:
-        return f"/api/videos/file/{key}"
+    def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
+        raise NotImplementedError("Local file serving not supported — use R2Storage")
 
     def delete(self, key: str) -> None:
         path = self._full_path(key)
@@ -111,10 +115,10 @@ class R2Storage(StorageBackend):
         )
         return {"url": url, "fields": {"Content-Type": content_type}}
 
-    def get_presigned_read_url(self, key: str, expires: int = 3600) -> str:
+    def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
         if not key:
             return None
-        if self.public_url:
+        if self.public_url and is_public:
             return f"{self.public_url}/{key}"
         return self.client.generate_presigned_url(
             "get_object",

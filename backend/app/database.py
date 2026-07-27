@@ -100,7 +100,7 @@ class Video(Base):
 
     # ── إعدادات التفريغ ─────────────────────────────
     dialect = Column(String, default=ArabicDialect.STANDARD)
-    is_public = Column(Boolean, default=True)   # رابط المشاركة العام
+    is_public = Column(Boolean, default=False)   # رابط المشاركة العام — خصوصي افتراضياً
     share_token = Column(String, unique=True, default=lambda: uuid.uuid4().hex)
 
     # ── مشاركة محمية ───────────────────────────────

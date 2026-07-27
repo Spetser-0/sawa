@@ -24,6 +24,17 @@ from app.storage import storage
 router = APIRouter()
 
 
+def _is_truly_public(video: Video) -> bool:
+    """Returns True only if the video is public with no password or expiry protection."""
+    if not video.is_public:
+        return False
+    if video.share_password_hash:
+        return False
+    if video.share_expires_at and video.share_expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+        return False
+    return True
+
+
 # ── Schemas ───────────────────────────────────────────
 class VideoResponse(BaseModel):
     id:           str
@@ -378,7 +389,7 @@ def get_my_videos(
     for v in videos:
         r = VideoResponse.model_validate(v)
         r.transcript_status = v.transcript.status if v.transcript else None
-        r.thumbnail_url = storage().get_presigned_read_url(v.thumbnail_path) if v.thumbnail_path else None
+        r.thumbnail_url = storage().get_presigned_read_url(v.thumbnail_path, is_public=_is_truly_public(v)) if v.thumbnail_path else None
         result.append(r)
     return result
 
@@ -409,7 +420,7 @@ def get_video_by_share_token(
                 "title": video.title,
                 "requires_password": True,
                 "share_token": video.share_token,
-                "thumbnail_url": storage().get_presigned_read_url(video.thumbnail_path) if video.thumbnail_path else None,
+                "thumbnail_url": storage().get_presigned_read_url(video.thumbnail_path, is_public=False) if video.thumbnail_path else None,
             }
         # تحقق من كلمة المرور
         if not verify_password(password, video.share_password_hash):
@@ -419,7 +430,7 @@ def get_video_by_share_token(
     db.commit()
     r = VideoResponse.model_validate(video)
     r.transcript_status = video.transcript.status if video.transcript else None
-    r.thumbnail_url = storage().get_presigned_read_url(video.thumbnail_path) if video.thumbnail_path else None
+    r.thumbnail_url = storage().get_presigned_read_url(video.thumbnail_path, is_public=_is_truly_public(video)) if video.thumbnail_path else None
     return r
 
 
@@ -447,7 +458,7 @@ def stream_video_by_share_token(
 
     # ── R2: أعد تحويلة إلى presigned URL ──
     store = storage()
-    presigned = store.get_presigned_read_url(video.file_path)
+    presigned = store.get_presigned_read_url(video.file_path, is_public=_is_truly_public(video))
     if presigned and presigned.startswith("http"):
         return RedirectResponse(url=presigned, status_code=302)
 
@@ -500,6 +511,7 @@ def update_share_settings(
 #  POST /api/videos/share/{token}/unlock
 # ══════════════════════════════════════════════════════
 @router.post("/share/{token}/unlock")
+@limiter.limit("5/minute")
 def unlock_shared_video(
     token: str,
     data:  UnlockShareRequest,
@@ -551,7 +563,7 @@ def get_video(
 
     r = VideoResponse.model_validate(video)
     r.transcript_status = video.transcript.status if video.transcript else None
-    r.thumbnail_url = storage().get_presigned_read_url(video.thumbnail_path) if video.thumbnail_path else None
+    r.thumbnail_url = storage().get_presigned_read_url(video.thumbnail_path, is_public=_is_truly_public(video)) if video.thumbnail_path else None
     return r
 
 
@@ -574,7 +586,7 @@ def stream_video(
 
     # ── R2: أعد تحويلة إلى presigned URL ──
     store = storage()
-    presigned = store.get_presigned_read_url(video.file_path)
+    presigned = store.get_presigned_read_url(video.file_path, is_public=_is_truly_public(video))
     if presigned and presigned.startswith("http"):
         return RedirectResponse(url=presigned, status_code=302)
 
@@ -609,7 +621,7 @@ def get_hls_playlist(
 
     # ── R2: أعد تحويلة إلى presigned URL ──
     store = storage()
-    presigned = store.get_presigned_read_url(video.hls_playlist_path)
+    presigned = store.get_presigned_read_url(video.hls_playlist_path, is_public=_is_truly_public(video))
     if presigned and presigned.startswith("http"):
         return RedirectResponse(url=presigned, status_code=302)
 
