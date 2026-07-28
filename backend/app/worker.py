@@ -2,6 +2,7 @@ import os
 import json
 import logging
 from celery import Celery
+from celery.schedules import crontab
 from app.config import settings
 from app.database import SessionLocal, Video, Transcript, TranscriptStatus
 from app.storage import storage
@@ -24,6 +25,13 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+celery_app.conf.beat_schedule = {
+    "cleanup-pending-videos": {
+        "task": "app.worker.cleanup_pending_videos",
+        "schedule": crontab(minute="*/15"),
+    },
+}
 
 @celery_app.task(name="app.worker.transcribe_task")
 def transcribe_task(video_id: str, file_path: str, language: str, noise_reduction: bool = False, r2_key: str = None):
@@ -118,3 +126,27 @@ def thumbnail_task(video_id: str, file_path: str, r2_key: str = None):
         db.close()
         if tmp_file and os.path.exists(tmp_file):
             os.remove(tmp_file)
+
+
+@celery_app.task(name="app.worker.cleanup_pending_videos")
+def cleanup_pending_videos():
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=settings.PENDING_UPLOAD_TTL_MINUTES)
+    db = SessionLocal()
+    store = storage()
+    try:
+        stale = db.query(Video).filter(
+            Video.status == "pending",
+            Video.created_at < cutoff,
+        ).all()
+        for v in stale:
+            try:
+                store.delete(v.file_path)
+            except Exception:
+                pass
+            db.delete(v)
+        db.commit()
+        logger.info(f"Cleaned up {len(stale)} pending videos")
+        return {"deleted": len(stale)}
+    finally:
+        db.close()

@@ -29,6 +29,16 @@ class StorageBackend(ABC):
         ...
 
     @abstractmethod
+    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
+        """Presigned POST with content-length-range enforcement."""
+        ...
+
+    @abstractmethod
+    def head_object(self, key: str) -> Optional[dict]:
+        """Return {size, content_type, etag} or None if not found."""
+        ...
+
+    @abstractmethod
     def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
         """أعد presigned URL للقراءة مع انتهاء صلاحية. لا تستخدم روابط عامة دائمة."""
         ...
@@ -78,6 +88,16 @@ class LocalStorage(StorageBackend):
 
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
         return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
+
+    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
+        return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
+
+    def head_object(self, key: str) -> Optional[dict]:
+        path = self._full_path(key)
+        if not os.path.exists(path):
+            return None
+        st = os.stat(path)
+        return {"size": st.st_size, "content_type": "application/octet-stream", "etag": None}
 
     def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
         raise NotImplementedError("Local file serving not supported — use R2Storage")
@@ -133,6 +153,32 @@ class R2Storage(StorageBackend):
             ExpiresIn=expires,
         )
         return {"url": url, "fields": {"Content-Type": content_type}}
+
+    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
+        """Presigned POST with content-length-range enforced by R2."""
+        return self.client.generate_presigned_post(
+            Bucket=self.bucket,
+            Key=key,
+            Fields={"Content-Type": content_type},
+            Conditions=[
+                {"Content-Type": content_type},
+                ["content-length-range", 1, max_bytes],
+            ],
+            ExpiresIn=expires_in,
+        )
+
+    def head_object(self, key: str) -> Optional[dict]:
+        try:
+            r = self.client.head_object(Bucket=self.bucket, Key=key)
+            return {
+                "size": r["ContentLength"],
+                "content_type": r.get("ContentType"),
+                "etag": r.get("ETag"),
+            }
+        except self.client.exceptions.ClientError:
+            return None
+        except Exception:
+            return None
 
     def get_presigned_read_url(self, key: str, expires: int = 3600, is_public: bool = True) -> str:
         """Always generate a presigned URL with expiration.

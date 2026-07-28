@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _select_for_update(db, table, uid):
+    """SELECT FOR UPDATE on PostgreSQL, plain SELECT on SQLite."""
+    dialect = db.bind.dialect.name if db.bind else "unknown"
+    if dialect == "sqlite":
+        row = db.execute(text(f"SELECT plan FROM {table} WHERE id = :uid"), {"uid": uid}).fetchone()
+    else:
+        row = db.execute(text(f"SELECT plan FROM {table} WHERE id = :uid FOR UPDATE"), {"uid": uid}).fetchone()
+    return row
+
+
 def _is_truly_public(video: Video) -> bool:
     """Returns True only if the video is public with no password or expiry protection."""
     if not video.is_public:
@@ -246,14 +256,14 @@ async def upload_video(
         )
 
     # ── Prevent race condition with SELECT FOR UPDATE ──
-    user_row = db.execute(
-        text("SELECT plan FROM users WHERE id = :uid FOR UPDATE"),
-        {"uid": current_user.id},
-    ).fetchone()
+    user_row = _select_for_update(db, "users", current_user.id)
     user_plan = user_row[0] if user_row else current_user.plan
 
     if user_plan == "free":
-        video_count = db.query(Video).filter(Video.owner_id == current_user.id).count()
+        video_count = db.query(Video).filter(
+            Video.owner_id == current_user.id,
+            Video.status != "pending",
+        ).count()
         if video_count >= settings.FREE_MAX_VIDEOS:
             raise HTTPException(
                 status_code=403,
@@ -439,14 +449,14 @@ def get_presigned_upload(
         raise HTTPException(status_code=400, detail="نوع المحتوى غير مدعوم")
 
     # ── Enforce plan limits (SELECT FOR UPDATE) ──
-    user_row = db.execute(
-        text("SELECT plan FROM users WHERE id = :uid FOR UPDATE"),
-        {"uid": current_user.id},
-    ).fetchone()
+    user_row = _select_for_update(db, "users", current_user.id)
     user_plan = user_row[0] if user_row else current_user.plan
 
     if user_plan == "free":
-        video_count = db.query(Video).filter(Video.owner_id == current_user.id).count()
+        video_count = db.query(Video).filter(
+            Video.owner_id == current_user.id,
+            Video.status != "pending",
+        ).count()
         if video_count >= settings.FREE_MAX_VIDEOS:
             raise HTTPException(
                 status_code=403,
@@ -467,6 +477,7 @@ def get_presigned_upload(
         file_path=r2_key,
         dialect=dialect,
         owner_id=current_user.id,
+        status="pending",
     )
     db.add(video)
     transcript = Transcript(video_id=video_id)
@@ -474,8 +485,8 @@ def get_presigned_upload(
     db.commit()
 
     store = storage()
-    result = store.get_presigned_upload_url(r2_key, content_type)
-    return {"key": r2_key, "video_id": video_id, **result}
+    result = store.get_presigned_upload_post(r2_key, content_type, settings.MAX_UPLOAD_BYTES)
+    return {"video_id": video_id, **result}
 
 
 # ══════════════════════════════════════════════════════
@@ -496,8 +507,23 @@ def complete_upload(
         raise HTTPException(404, "الفيديو غير موجود")
 
     store = storage()
-    if not store.exists(video.file_path):
+    head = store.head_object(video.file_path)
+    if not head:
         raise HTTPException(400, "الملف لم يتم رفعه بعد")
+    if head["size"] < 1024:
+        store.delete(video.file_path)
+        db.delete(video)
+        db.commit()
+        raise HTTPException(400, "الملف فارغ أو تالف")
+    if head["size"] > settings.MAX_UPLOAD_BYTES:
+        store.delete(video.file_path)
+        db.delete(video)
+        db.commit()
+        raise HTTPException(413, "الملف أكبر من الحد المسموح")
+
+    video.file_size = head["size"]
+    video.status = "uploaded"
+    db.commit()
 
     # ── Trigger Celery tasks (HLS, thumbnail, transcription) ──
     from app.worker import transcribe_task, hls_task, thumbnail_task

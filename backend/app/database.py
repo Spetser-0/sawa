@@ -114,6 +114,9 @@ class Video(Base):
     # ── الصورة المصغرة ─────────────────────────────
     thumbnail_path = Column(String, nullable=True)
 
+    # ── الحالة ──────────────────────────────────────
+    status = Column(String, default="uploaded")
+
     # ── البيانات الوصفية ─────────────────────────────
     views_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=_utcnow)

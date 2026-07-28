@@ -172,9 +172,12 @@ export const videosAPI = {
     const { url, fields, video_id } = presigned;
 
     return new Promise((resolve, reject) => {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+      fd.append("file", file);
+
       const xhr = new XMLHttpRequest();
-      xhr.open("PUT", url);
-      xhr.setRequestHeader("Content-Type", file.type || "video/webm");
+      xhr.open("POST", url);
 
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -194,7 +197,8 @@ export const videosAPI = {
             reject(err);
           }
         } else {
-          reject(new Error(`فشل الرفع المباشر: ${xhr.status}`));
+          const msg = xhr.responseText || xhr.status;
+          reject(new Error(`فشل الرفع المباشر: ${msg}`));
         }
       };
 
@@ -203,7 +207,7 @@ export const videosAPI = {
       xhr.onabort = () => { currentUpload = null; reject(new Error("تم إلغاء الرفع")); };
 
       xhr.timeout = 600000;
-      xhr.send(file);
+      xhr.send(fd);
       currentUpload = xhr;
     });
   },

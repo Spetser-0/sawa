@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # ── التخزين ──────────────────────────────────────
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 500
+    MAX_UPLOAD_BYTES: int = 2 * 1024 * 1024 * 1024   # 2 GB hard cap (enforced by R2 presigned POST)
     ALLOWED_EXTENSIONS: list = ["mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac"]
 
     # ── نموذج Whisper ────────────────────────────────
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
     FREE_MAX_VIDEOS: int = 25
     FREE_MAX_DURATION_SECONDS: int = 300
     PRO_MAX_DURATION_SECONDS: int = 3600
+    PENDING_UPLOAD_TTL_MINUTES: int = 60
 
     # ── مفاتيح خارجية ────────────────────────────────
     ANTHROPIC_API_KEY: Optional[str] = None
