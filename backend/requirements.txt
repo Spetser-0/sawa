@@ -24,3 +24,7 @@ alembic
 boto3
 requests
 sentry-sdk[fastapi]
+celery
+redis
+anthropic
+python-magic

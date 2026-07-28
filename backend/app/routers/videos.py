@@ -12,7 +12,7 @@ import aiofiles
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from pydantic import BaseModel
 from app.limiter import limiter
@@ -322,9 +322,10 @@ async def upload_video(
     db.commit()
     db.refresh(video)
 
-    # ── تفريغ صوتي ──
-    background_tasks.add_task(
-        run_transcription_task,
+    # ── Celery Tasks ──
+    from app.worker import transcribe_task, hls_task, thumbnail_task
+    
+    transcribe_task.delay(
         video_id     = video_id,
         file_path    = tmp_path if use_r2 else file_path,
         r2_key       = r2_key,
@@ -332,17 +333,13 @@ async def upload_video(
         noise_reduction = noise_reduction,
     )
 
-    # ── تحويل HLS تلقائي ──
-    background_tasks.add_task(
-        _run_hls_conversion,
+    hls_task.delay(
         video_id  = video_id,
         input_path = tmp_path if use_r2 else file_path,
         r2_key    = r2_key,
     )
 
-    # ── صورة مصغرة تلقائية ──
-    background_tasks.add_task(
-        _run_thumbnail_generation,
+    thumbnail_task.delay(
         video_id  = video_id,
         file_path = tmp_path if use_r2 else file_path,
         r2_key   = r2_key,
@@ -481,16 +478,21 @@ def get_my_videos(
 ):
     videos = (
         db.query(Video)
+        .options(joinedload(Video.transcript))
         .filter(Video.owner_id == current_user.id)
         .order_by(Video.created_at.desc())
         .all()
     )
+    
     store = storage()
+    # Batch process thumbnail URLs if needed, but get_presigned_read_url is usually a local sign operation.
+    # The real N+1 was the transcript relation.
     result = []
     for v in videos:
         r = VideoResponse.model_validate(v)
         r.transcript_status = v.transcript.status if v.transcript else None
         if v.thumbnail_path:
+            # Note: This is still O(N) calls to sign, but no longer hits DB per item.
             r.thumbnail_url = store.get_presigned_read_url(
                 v.thumbnail_path, is_public=_is_truly_public(v)
             )
@@ -767,8 +769,8 @@ def trigger_hls_conversion(
     store = storage()
     input_path = store.get_local_path(video.file_path) or video.file_path
 
-    background_tasks.add_task(
-        _run_hls_conversion,
+    from app.worker import hls_task
+    hls_task.delay(
         video_id=video_id,
         input_path=input_path,
         r2_key=video.file_path if not store.get_local_path(video.file_path) else None,

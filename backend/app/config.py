@@ -54,6 +54,19 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
     ENVIRONMENT: str = "development"
 
+    # ── Celery & Redis ──────────────────────────────
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: Optional[str] = None
+    CELERY_RESULT_BACKEND: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _setup_celery(self):
+        if not self.CELERY_BROKER_URL:
+            self.CELERY_BROKER_URL = self.REDIS_URL
+        if not self.CELERY_RESULT_BACKEND:
+            self.CELERY_RESULT_BACKEND = self.REDIS_URL
+        return self
+
     @model_validator(mode="after")
     def _auto_cookie_secure(self):
         if self.ENVIRONMENT == "production":

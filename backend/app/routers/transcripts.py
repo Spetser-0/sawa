@@ -133,9 +133,8 @@ def retry_transcription(
     transcript.status = TranscriptStatus.PENDING
     transcript.error_message = None
     db.commit()
-    from app.routers.videos import run_transcription_task
-    background_tasks.add_task(
-        run_transcription_task,
+    from app.worker import transcribe_task
+    transcribe_task.delay(
         video_id=video_id,
         file_path=video.file_path,
         language=video.dialect if len(video.dialect) == 2 else "ar",
