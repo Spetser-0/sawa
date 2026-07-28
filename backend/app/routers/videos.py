@@ -63,6 +63,12 @@ ALLOWED_EXTENSIONS = {
     "mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac"
 }
 
+ALLOWED_UPLOAD_CONTENT_TYPES = {
+    "video/mp4", "video/quicktime", "video/webm", "video/x-msvideo",
+    "video/x-matroska", "video/ogg", "audio/mpeg", "audio/wav",
+    "audio/mp4", "audio/ogg", "audio/flac", "application/octet-stream",
+}
+
 
 def _validate_file_magic(file_path: str, declared_ext: str) -> bool:
     """Check file header bytes against declared extension."""
@@ -418,6 +424,7 @@ def _run_thumbnail_generation(video_id: str, file_path: str, r2_key: str = None)
 #  POST /api/videos/presigned-upload
 # ══════════════════════════════════════════════════════
 @router.post("/presigned-upload")
+@limiter.limit("10/minute")
 def get_presigned_upload(
     request:      Request,
     filename:     str,
@@ -428,6 +435,9 @@ def get_presigned_upload(
     current_user: User = Depends(require_auth),
 ):
     """يُعطي رابط رفع مباشر للمتصفح (لـ R2) مع التحقق من الخطة."""
+    if content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="نوع المحتوى غير مدعوم")
+
     # ── Enforce plan limits (SELECT FOR UPDATE) ──
     user_row = db.execute(
         text("SELECT plan FROM users WHERE id = :uid FOR UPDATE"),
@@ -466,6 +476,50 @@ def get_presigned_upload(
     store = storage()
     result = store.get_presigned_upload_url(r2_key, content_type)
     return {"key": r2_key, "video_id": video_id, **result}
+
+
+# ══════════════════════════════════════════════════════
+#  POST /api/videos/{id}/complete
+# ══════════════════════════════════════════════════════
+@router.post("/{video_id}/complete")
+def complete_upload(
+    video_id:         str,
+    background_tasks: BackgroundTasks,
+    db:               Session = Depends(get_db),
+    current_user:     User    = Depends(require_auth),
+):
+    """Finalize a presigned-upload: validate the R2 object exists and trigger processing."""
+    video = db.query(Video).filter(
+        Video.id == video_id, Video.owner_id == current_user.id
+    ).first()
+    if not video:
+        raise HTTPException(404, "الفيديو غير موجود")
+
+    store = storage()
+    if not store.exists(video.file_path):
+        raise HTTPException(400, "الملف لم يتم رفعه بعد")
+
+    # ── Trigger Celery tasks (HLS, thumbnail, transcription) ──
+    from app.worker import transcribe_task, hls_task, thumbnail_task
+
+    transcribe_task.delay(
+        video_id=video_id,
+        file_path=video.file_path,
+        r2_key=video.file_path,
+        language=video.dialect,
+    )
+    hls_task.delay(
+        video_id=video_id,
+        input_path=video.file_path,
+        r2_key=video.file_path,
+    )
+    thumbnail_task.delay(
+        video_id=video_id,
+        file_path=video.file_path,
+        r2_key=video.file_path,
+    )
+
+    return VideoResponse.model_validate(video)
 
 
 # ══════════════════════════════════════════════════════
