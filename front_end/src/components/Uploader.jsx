@@ -285,6 +285,7 @@ export default function Uploader({ onSuccess }) {
             accept="video/*,audio/*"
             className="uploader-file-input"
             onChange={handleInputChange}
+            title=""
           />
           <div className="uploader-dropzone-icon">
             <UploadCloud size={32} strokeWidth={1.5} />

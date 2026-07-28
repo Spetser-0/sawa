@@ -500,7 +500,7 @@ export default function Recorder({ onUploadDone }) {
                 type="file"
                 accept="video/*,audio/*"
                 aria-hidden="true"
-                style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap" }}
+                style={{ position: "absolute", opacity: 0, inset: 0, width: "100%", height: "100%", cursor: "pointer", zIndex: 1 }}
                 onChange={handleFileSelect}
               />
               <button
