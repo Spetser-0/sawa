@@ -1,5 +1,5 @@
 /**
-2	 * API Client — Cross-Domain + CSRF + Bearer Fallback + Retry + Abort
+2	 * API Client - Cross-Domain + CSRF + Bearer Fallback + Retry + Abort
 2	 */
 3	
 4	const API_BASE = import.meta.env.VITE_API_URL
