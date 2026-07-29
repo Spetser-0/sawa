@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { UploadCloud, HardDrive, FolderOpen, CheckCircle2, X } from "lucide-react";
 import { videosAPI } from "../api/client";
@@ -51,6 +51,18 @@ export default function Uploader({ onSuccess }) {
   const [dragOver, setDragOver] = useState(false);
 
   const fileInputRef = useRef(null);
+  // Track blob URLs so we can revoke them after use to prevent memory leaks
+  const blobUrlRef = useRef(null);
+
+  // Revoke any tracked blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const validateFile = useCallback(
     (file) => {
@@ -128,11 +140,21 @@ export default function Uploader({ onSuccess }) {
       );
       setVideoId(video.id);
       setState("done");
+      // Revoke any blob URL now that upload is complete and preview is no longer needed
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
       toast.success(t("uploader.toast_success"));
       if (onSuccess) onSuccess(video.id);
     } catch (err) {
       setError(`${t("uploader.error_upload_failed")}${err.message}`);
       setState("idle");
+      // Also revoke on failure so leaked URLs are cleaned up
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
     }
   }, [selectedFile, title, dialect, noiseReduction, t, toast, onSuccess]);
 
@@ -231,10 +253,21 @@ export default function Uploader({ onSuccess }) {
       const blob = new Blob(chunks, {
         type: picked.mimeType || "video/mp4",
       });
-      const ext = picked.name?.split(".").pop() || "mp4";
+      // Determine extension: prefer the extension already present in the filename,
+      // then fall back to deriving it from the MIME type, then hardcode "mp4".
+      const originalName = picked.name || "drive-video";
+      const hasExtension = /\.[a-z0-9]{2,4}$/i.test(originalName);
+      const mimeExt = (picked.mimeType || "")
+        .split("/")[1]
+        ?.replace(/;.*/, "")
+        .toLowerCase() || "mp4";
+      const finalName = hasExtension ? originalName : `${originalName}.${mimeExt}`;
+      // Track blob URL if one is created for preview purposes
+      const blobUrl = URL.createObjectURL(blob);
+      blobUrlRef.current = blobUrl;
       const localFile = new File(
         [blob],
-        `${picked.name || "drive-video"}.${ext}`,
+        finalName,
         { type: picked.mimeType || "video/mp4" },
       );
 
@@ -251,6 +284,11 @@ export default function Uploader({ onSuccess }) {
       );
       setVideoId(video.id);
       setState("done");
+      // Revoke blob URL now that upload is complete
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
       toast.success(t("uploader.toast_success"));
       if (onSuccess) onSuccess(video.id);
     } catch (err) {
@@ -302,6 +340,7 @@ export default function Uploader({ onSuccess }) {
           <button
             className="btn btn-primary uploader-browse-btn"
             type="button"
+            onClick={() => fileInputRef.current?.click()}
           >
             <FolderOpen size={16} />
             {t("uploader.browse")}

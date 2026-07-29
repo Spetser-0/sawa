@@ -32,7 +32,11 @@ const LANGUAGES = [
 ];
 
 const ALLOWED_EXTENSIONS = ["mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac"];
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+// Feature-detect screen capture support at runtime rather than assuming mobile = unsupported.
+// Some Android Chrome/Edge builds support getDisplayMedia; desktop browsers that don't
+// (e.g. older Safari) should also be handled gracefully.
+const supportsDisplayMedia = typeof navigator !== "undefined" &&
+  typeof navigator.mediaDevices?.getDisplayMedia === "function";
 
 export default function Recorder({ onUploadDone }) {
   const { t } = useTranslation();
@@ -41,7 +45,7 @@ export default function Recorder({ onUploadDone }) {
   const [progress, setProgress] = useState(0);
   const [title, setTitle]       = useState("");
   const [dialect, setDialect]   = useState("ar");
-  const [mode, setMode]         = useState(isMobile ? "camera" : "screen");
+  const [mode, setMode]         = useState(supportsDisplayMedia ? "screen" : "camera");
   const [error, setError]       = useState("");
   const [videoId, setVideoId]   = useState(null);
   const [noiseReduction, setNoiseReduction] = useState(false);
@@ -54,6 +58,18 @@ export default function Recorder({ onUploadDone }) {
   const previewRef       = useRef(null);
   const previewStreamRef = useRef(null);
   const fileInputRef     = useRef(null);
+  // Track blob URLs for the recorded output so we can revoke them and avoid memory leaks.
+  const blobUrlRef       = useRef(null);
+
+  // Revoke any held blob URL on unmount (covers navigation-away mid-upload).
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const uploadFile = useCallback(async (file, uploadMode) => {
     setState("uploading");
@@ -180,12 +196,27 @@ export default function Recorder({ onUploadDone }) {
       }
 
       const blob = new Blob(chunks, { type: file.mimeType || "video/mp4" });
-      const ext = file.name?.split(".").pop() || "mp4";
-      const localFile = new File([blob], `${file.name || "drive-video"}.${ext}`, {
+      // Determine extension: prefer one already in the filename, fall back to MIME type.
+      const originalName = file.name || "drive-video";
+      const hasExtension = /\.[a-z0-9]{2,4}$/i.test(originalName);
+      const mimeExt = (file.mimeType || "")
+        .split("/")[1]
+        ?.replace(/;.*/, "")
+        .toLowerCase() || "mp4";
+      const finalName = hasExtension ? originalName : `${originalName}.${mimeExt}`;
+      // Track blob URL for cleanup.
+      const driveBlob = URL.createObjectURL(blob);
+      blobUrlRef.current = driveBlob;
+      const localFile = new File([blob], finalName, {
         type: file.mimeType || "video/mp4",
       });
 
       await uploadFile(localFile, "screen");
+      // Revoke the drive blob URL after upload (uploadFile handles state transitions).
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
     } catch (err) {
       if (err.message === t("recorder.error_cancelled")) return;
       setError(`${t("recorder.error_import_failed")}${err.message}`);
@@ -204,7 +235,7 @@ export default function Recorder({ onUploadDone }) {
     try {
       let combinedStream;
 
-      if (mode === "camera" || isMobile) {
+      if (mode === "camera") {
         const camStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: true,
@@ -320,6 +351,9 @@ export default function Recorder({ onUploadDone }) {
     const mimeType = mediaRecorderRef.current?.mimeType || "video/webm";
     const ext = mimeType.includes("mp4") ? "mp4" : "webm";
     const blob = new Blob(chunksRef.current, { type: mimeType });
+    // Create and track a blob URL for this recording.
+    const blobUrl = URL.createObjectURL(blob);
+    blobUrlRef.current = blobUrl;
     const file = new File([blob], `${title || "تسجيل"}-${Date.now()}.${ext}`, {
       type: mimeType,
     });
@@ -335,10 +369,20 @@ export default function Recorder({ onUploadDone }) {
       );
       setVideoId(video.id);
       setState("done");
+      // Revoke the blob URL once the upload is done and the preview is no longer active.
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
       if (onUploadDone) onUploadDone(video);
     } catch (err) {
       setError(`${t("recorder.error_upload_failed")}${err.message}`);
       setState("idle");
+      // Also revoke on upload failure.
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
     }
   };
 
@@ -483,12 +527,30 @@ export default function Recorder({ onUploadDone }) {
           )}
 
           <div style={{ display: "flex", background: "var(--bg)", borderRadius: 10, padding: 4, marginBottom: 16 }}>
-              {[["screen", t("recorder.screen_recording")], ["camera", t("recorder.camera")], ["file", t("recorder.from_files")]].map(([m, label]) => (
-                <button key={m} onClick={() => setMode(m)} style={tabStyle(mode === m)}>
-                  {label}
-                </button>
-              ))}
+              {[["screen", t("recorder.screen_recording")], ["camera", t("recorder.camera")], ["file", t("recorder.from_files")]].map(([m, label]) => {
+                const isScreenTab = m === "screen";
+                const disabled = isScreenTab && !supportsDisplayMedia;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => !disabled && setMode(m)}
+                    style={{
+                      ...tabStyle(mode === m),
+                      ...(disabled ? { opacity: 0.45, cursor: "not-allowed" } : {}),
+                    }}
+                    title={disabled ? t("recorder.screen_not_supported", "Screen recording isn't supported in this browser") : undefined}
+                    aria-disabled={disabled}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
+          {!supportsDisplayMedia && mode === "screen" && (
+            <div style={{ padding: "10px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 13, color: "#F87171", marginBottom: 16, textAlign: "center" }}>
+              {t("recorder.screen_not_supported", "Screen recording isn't supported in this browser")}
+            </div>
+          )}
 
           {mode === "file" && (
             <div style={{ textAlign: "center", marginBottom: 16 }}>
@@ -516,7 +578,7 @@ export default function Recorder({ onUploadDone }) {
 
           {mode !== "file" && (
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16, textAlign: "center" }}>
-              {mode === "camera" || isMobile
+              {mode === "camera"
                 ? t("recorder.camera_desc")
                 : t("recorder.screen_desc")}
             </div>
@@ -595,7 +657,7 @@ export default function Recorder({ onUploadDone }) {
               </>
             ) : (
               <button className="btn btn-primary btn-lg" onClick={startRecording} style={{ width: "100%", justifyContent: "center" }}>
-                {mode === "camera" || isMobile ? <Camera size={18} /> : <Video size={18} />}
+                {mode === "camera" ? <Camera size={18} /> : <Video size={18} />}
                 {t("recorder.start_recording")}
               </button>
             )}
