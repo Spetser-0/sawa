@@ -14,7 +14,7 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, B
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.limiter import limiter
 
 from app.database import get_db, Video, Transcript, TranscriptStatus, User
@@ -122,6 +122,13 @@ class ShareSettingsRequest(BaseModel):
 
 class UnlockShareRequest(BaseModel):
     password: str
+
+
+class PresignedUploadRequest(BaseModel):
+    filename:     str  = Field(..., min_length=1, max_length=255)
+    content_type: str  = "video/webm"
+    title:        str  = Field(default="تسجيل جديد", max_length=200)
+    dialect:      str  = Field(default="ar", max_length=10)
 
 
 # ══════════════════════════════════════════════════════
@@ -437,15 +444,12 @@ def _run_thumbnail_generation(video_id: str, file_path: str, r2_key: str = None)
 @limiter.limit("10/minute")
 def get_presigned_upload(
     request:      Request,
-    filename:     str,
-    content_type: str = "video/webm",
-    title:        str = "تسجيل جديد",
-    dialect:      str = "ar",
+    payload:      PresignedUploadRequest,
     db:           Session = Depends(get_db),
     current_user: User = Depends(require_auth),
 ):
     """يُعطي رابط رفع مباشر للمتصفح (لـ R2) مع التحقق من الخطة."""
-    if content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+    if payload.content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="نوع المحتوى غير مدعوم")
 
     # ── Enforce plan limits (SELECT FOR UPDATE) ──
@@ -463,7 +467,7 @@ def get_presigned_upload(
                 detail=f"وصلت للحد الأقصى ({settings.FREE_MAX_VIDEOS} تسجيل) في الخطة المجانية.",
             )
 
-    ext = Path(filename).suffix.lower().lstrip(".")
+    ext = Path(payload.filename).suffix.lower().lstrip(".")
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="نوع الملف غير مدعوم")
 
@@ -473,9 +477,9 @@ def get_presigned_upload(
     # ── Create pending video record ──
     video = Video(
         id=video_id,
-        title=title,
+        title=payload.title,
         file_path=r2_key,
-        dialect=dialect,
+        dialect=payload.dialect,
         owner_id=current_user.id,
         status="pending",
     )
@@ -485,7 +489,7 @@ def get_presigned_upload(
     db.commit()
 
     store = storage()
-    result = store.get_presigned_upload_post(r2_key, content_type, settings.MAX_UPLOAD_BYTES)
+    result = store.get_presigned_upload_post(r2_key, payload.content_type, settings.MAX_UPLOAD_BYTES)
     return {"video_id": video_id, **result}
 
 
