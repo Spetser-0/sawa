@@ -449,7 +449,8 @@ def get_presigned_upload(
     current_user: User = Depends(require_auth),
 ):
     """يُعطي رابط رفع مباشر للمتصفح (لـ R2) مع التحقق من الخطة."""
-    if payload.content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+    content_type = payload.content_type.split(";")[0].strip().lower()
+    if content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="نوع المحتوى غير مدعوم")
 
     # ── Enforce plan limits (SELECT FOR UPDATE) ──
@@ -489,7 +490,7 @@ def get_presigned_upload(
     db.commit()
 
     store = storage()
-    result = store.get_presigned_upload_post(r2_key, payload.content_type, settings.MAX_UPLOAD_BYTES)
+    result = store.get_presigned_upload_post(r2_key, content_type, settings.MAX_UPLOAD_BYTES)
     return {"video_id": video_id, **result}
 
 
