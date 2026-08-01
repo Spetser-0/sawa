@@ -37,6 +37,9 @@ const ALLOWED_EXTENSIONS = ["mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "m
 // (e.g. older Safari) should also be handled gracefully.
 const supportsDisplayMedia = typeof navigator !== "undefined" &&
   typeof navigator.mediaDevices?.getDisplayMedia === "function";
+// Used to show a mobile-specific notice banner and the camera-flip button.
+const isMobile = typeof navigator !== "undefined" &&
+  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 export default function Recorder({ onUploadDone }) {
   const { t } = useTranslation();
