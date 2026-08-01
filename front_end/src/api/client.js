@@ -167,6 +167,7 @@ export const videosAPI = {
       content_type: file.type || "video/webm",
       title,
       dialect,
+      noise_reduction: noiseReduction,
     });
 
     const { url, fields, video_id } = presigned;

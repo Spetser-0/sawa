@@ -125,10 +125,11 @@ class UnlockShareRequest(BaseModel):
 
 
 class PresignedUploadRequest(BaseModel):
-    filename:     str  = Field(..., min_length=1, max_length=255)
-    content_type: str  = "video/webm"
-    title:        str  = Field(default="تسجيل جديد", max_length=200)
-    dialect:      str  = Field(default="ar", max_length=10)
+    filename:        str  = Field(..., min_length=1, max_length=255)
+    content_type:    str  = "video/webm"
+    title:           str  = Field(default="تسجيل جديد", max_length=200)
+    dialect:         str  = Field(default="ar", max_length=10)
+    noise_reduction: bool = False
 
 
 # ══════════════════════════════════════════════════════
@@ -483,6 +484,7 @@ def get_presigned_upload(
         dialect=payload.dialect,
         owner_id=current_user.id,
         status="pending",
+        noise_reduction=payload.noise_reduction,
     )
     db.add(video)
     transcript = Transcript(video_id=video_id)
@@ -538,6 +540,7 @@ def complete_upload(
         file_path=video.file_path,
         r2_key=video.file_path,
         language=video.dialect,
+        noise_reduction=bool(video.noise_reduction),
     )
     hls_task.delay(
         video_id=video_id,
