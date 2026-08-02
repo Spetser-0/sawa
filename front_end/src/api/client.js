@@ -151,8 +151,8 @@ export const authAPI = {
 // ── Videos ───────────────────────────────────────────
 export const videosAPI = {
   /**
-   * Upload using Presigned URLs (Direct-to-R2)
-   * This is much more reliable for large files and works better on iOS.
+   * Upload via backend proxy (avoids CORS issues with direct-to-R2).
+   * The backend streams the file to R2 server-side.
    */
   upload: async (
     file,
@@ -162,23 +162,21 @@ export const videosAPI = {
     onProgress,
     noiseReduction = false,
   ) => {
-    const presigned = await request("POST", "/videos/presigned-upload", {
-      filename: file.name,
-      content_type: file.type || "video/webm",
-      title,
-      dialect,
-      noise_reduction: noiseReduction,
-    });
-
-    const { url, fields, video_id } = presigned;
-
     return new Promise((resolve, reject) => {
       const fd = new FormData();
-      for (const [k, v] of Object.entries(fields)) fd.append(k, v);
       fd.append("file", file);
+      fd.append("title", title || file.name || "تسجيل جديد");
+      fd.append("dialect", dialect);
+      fd.append("mode", mode);
+      fd.append("noise_reduction", noiseReduction ? "true" : "false");
 
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", url);
+      xhr.open("POST", `${API_BASE}/videos/upload`);
+
+      // Auth headers
+      const token = getAuthToken();
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
 
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -189,25 +187,45 @@ export const videosAPI = {
 
       xhr.onload = async () => {
         currentUpload = null;
-        if (xhr.status === 200 || xhr.status === 204) {
+        if (xhr.status === 200 || xhr.status === 201) {
           try {
-            await request("POST", `/videos/${video_id}/complete`);
-            const video = await videosAPI.getVideo(video_id);
+            const video = JSON.parse(xhr.responseText);
             resolve(video);
           } catch (err) {
-            reject(err);
+            reject(new Error("خطأ في تحليل استجابة الخادم"));
           }
+        } else if (xhr.status === 401) {
+          // Try token refresh once
+          try {
+            const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+              method: "POST",
+              credentials: "include",
+              mode: "cors",
+              headers: token ? { "Authorization": `Bearer ${token}` } : {},
+            });
+            if (refreshRes.ok) {
+              const data = await refreshRes.json();
+              if (data.access_token) setAuthToken(data.access_token);
+              // Retry upload with new token
+              videosAPI.upload(file, title, dialect, mode, onProgress, noiseReduction)
+                .then(resolve).catch(reject);
+              return;
+            }
+          } catch { /* refresh failed */ }
+          reject(new Error("انتهت صلاحية الجلسة"));
         } else {
-          const msg = xhr.responseText || xhr.status;
-          reject(new Error(`فشل الرفع المباشر: ${msg}`));
+          let msg = "فشل رفع الملف";
+          try { msg = JSON.parse(xhr.responseText)?.detail || msg; } catch { /* ignore */ }
+          reject(new Error(`${msg} (كود: ${xhr.status})`));
         }
       };
 
-      xhr.onerror = () => { currentUpload = null; reject(new Error("خطأ في الشبكة أثناء الرفع المباشر")); };
-      xhr.ontimeout = () => { currentUpload = null; reject(new Error("انتهت مهلة الرفع المباشر")); };
+      xhr.onerror = () => { currentUpload = null; reject(new Error("خطأ في الشبكة أثناء الرفع")); };
+      xhr.ontimeout = () => { currentUpload = null; reject(new Error("انتهت مهلة الرفع")); };
       xhr.onabort = () => { currentUpload = null; reject(new Error("تم إلغاء الرفع")); };
 
-      xhr.timeout = 600000;
+      xhr.withCredentials = true;
+      xhr.timeout = 600000; // 10 minutes
       xhr.send(fd);
       currentUpload = xhr;
     });
