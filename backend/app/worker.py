@@ -24,6 +24,16 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    # Fast-fail when the broker (Redis) is unreachable instead of hanging indefinitely.
+    # Without this, a dead broker causes kombu to retry for minutes, which manifests
+    # as a 500 in the web process after the DB commit has already succeeded.
+    broker_transport_options={
+        "max_retries": 2,
+        "interval_start": 0,
+        "interval_step": 0.2,
+        "interval_max": 1,
+    },
+    broker_connection_retry_on_startup=True,
 )
 
 celery_app.conf.beat_schedule = {
@@ -33,13 +43,41 @@ celery_app.conf.beat_schedule = {
     },
 }
 
+
+def dispatch(task, **kwargs) -> bool:
+    """ارسل مهمة Celery بأمان — إذا كان Redis/Broker غير متاح، سجّل الخطأ وأعد False
+    بدلاً من رفع استثناء يُعيد 500 بعد نجاح commit قاعدة البيانات."""
+    try:
+        task.delay(**kwargs)
+        return True
+    except Exception as exc:
+        logger.error(
+            "celery dispatch failed for %s: %s — the file is stored but the job was not queued.",
+            task.name, exc,
+        )
+        return False
+
 @celery_app.task(name="app.worker.transcribe_task")
-def transcribe_task(video_id: str, file_path: str, language: str, noise_reduction: bool = False, r2_key: str = None):
+def transcribe_task(
+    video_id: str,
+    file_path: str,
+    language: str,
+    noise_reduction: bool = False,
+    r2_key: str = None,
+):
     db = SessionLocal()
+    tmp_file = None
     try:
         transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
         if not transcript:
             return
+
+        # ── حمّل من R2 إن لم يكن الملف موجوداً محلياً ──
+        store = storage()
+        if r2_key and not os.path.exists(file_path):
+            tmp_file = os.path.join(settings.UPLOAD_DIR, f"transcribe_{video_id}.tmp")
+            store.download(r2_key, tmp_file)
+            file_path = tmp_file
 
         audio_path = extract_audio_if_needed(file_path)
 
@@ -75,6 +113,9 @@ def transcribe_task(video_id: str, file_path: str, language: str, noise_reductio
             db.commit()
     finally:
         db.close()
+        # احذف الملف المؤقت الذي حمّلناه من R2
+        if tmp_file and os.path.exists(tmp_file):
+            os.remove(tmp_file)
 
 @celery_app.task(name="app.worker.hls_task")
 def hls_task(video_id: str, input_path: str, r2_key: str = None):

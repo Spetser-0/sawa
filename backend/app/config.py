@@ -1,9 +1,12 @@
 """
 الإعدادات المركزية لمشروع سوى
 """
+import logging
 from pydantic_settings import BaseSettings
 from pydantic import model_validator
 from typing import Optional
+
+_config_logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -67,6 +70,22 @@ class Settings(BaseSettings):
             self.CELERY_BROKER_URL = self.REDIS_URL
         if not self.CELERY_RESULT_BACKEND:
             self.CELERY_RESULT_BACKEND = self.REDIS_URL
+
+        # تحذير صاخب عند التشغيل في الإنتاج بدون Redis مضبوط
+        if self.ENVIRONMENT == "production":
+            redis_is_default_localhost = (
+                self.REDIS_URL == "redis://localhost:6379/0"
+                and not self.CELERY_BROKER_URL.startswith("redis://localhost")
+                is False  # re-evaluate after both are set
+            )
+            # Simpler: warn if the final broker URL still points at localhost
+            if self.CELERY_BROKER_URL.startswith("redis://localhost"):
+                _config_logger.error(
+                    "❌ [CONFIG] ENVIRONMENT=production but CELERY_BROKER_URL/REDIS_URL is ‘%s’. "
+                    "Redis at localhost is NOT available on Render/cloud. "
+                    "Set the REDIS_URL env var to your Render Redis instance URL.",
+                    self.CELERY_BROKER_URL,
+                )
         return self
 
     @model_validator(mode="after")

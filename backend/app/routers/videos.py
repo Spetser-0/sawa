@@ -129,6 +129,7 @@ class PresignedUploadRequest(BaseModel):
     content_type: str  = "video/webm"
     title:        str  = Field(default="تسجيل جديد", max_length=200)
     dialect:      str  = Field(default="ar", max_length=10)
+    size:         int  = Field(default=0, ge=0)  # حجم الملف المعلن بالبايت — مطلوب لتفعيل الحراسة المسبقة
 
 
 # ══════════════════════════════════════════════════════
@@ -345,31 +346,54 @@ async def upload_video(
     db.commit()
     db.refresh(video)
 
-    # ── Celery Tasks ──
-    from app.worker import transcribe_task, hls_task, thumbnail_task
-    
-    transcribe_task.delay(
-        video_id     = video_id,
-        file_path    = tmp_path if use_r2 else file_path,
-        r2_key       = r2_key,
-        language     = dialect,
-        noise_reduction = noise_reduction,
-    )
+    # ── احذف tmp_path بعد commit الناجح — المهام ستحمّل من R2 مباشرة ──
+    if use_r2 and tmp_path and os.path.exists(tmp_path):
+        try:
+            os.remove(tmp_path)
+        except Exception as cleanup_err:
+            logger.warning(f"Could not remove tmp_path after R2 upload: {cleanup_err}")
 
-    hls_task.delay(
-        video_id  = video_id,
-        input_path = tmp_path if use_r2 else file_path,
-        r2_key    = r2_key,
-    )
+    # ── Celery Tasks (via safe dispatch helper) ──
+    from app.worker import transcribe_task, hls_task, thumbnail_task, dispatch
 
-    thumbnail_task.delay(
-        video_id  = video_id,
-        file_path = tmp_path if use_r2 else file_path,
-        r2_key   = r2_key,
-    )
+    # For R2 uploads, pass only the r2_key — tasks download from R2 into their own temp files.
+    task_file_path = r2_key if use_r2 else file_path
+
+    dispatched = all([
+        dispatch(
+            transcribe_task,
+            video_id=video_id,
+            file_path=task_file_path,
+            r2_key=r2_key,
+            language=dialect,
+            noise_reduction=noise_reduction,
+        ),
+        dispatch(
+            hls_task,
+            video_id=video_id,
+            input_path=task_file_path,
+            r2_key=r2_key,
+        ),
+        dispatch(
+            thumbnail_task,
+            video_id=video_id,
+            file_path=task_file_path,
+            r2_key=r2_key,
+        ),
+    ])
+
+    if not dispatched:
+        # الملف مخزّن، لكن Celery غير متاح — سجّل queue_failed حتى يتمكن المستخدم من إعادة المحاولة لاحقاً
+        from app.database import Transcript, TranscriptStatus
+        transcript_row = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+        if transcript_row:
+            transcript_row.status = TranscriptStatus.QUEUE_FAILED
+            db.commit()
 
     response = VideoResponse.model_validate(video)
-    response.transcript_status = TranscriptStatus.PENDING
+    response.transcript_status = (
+        TranscriptStatus.PENDING if dispatched else TranscriptStatus.QUEUE_FAILED
+    )
     return response
 
 
@@ -448,10 +472,20 @@ def get_presigned_upload(
     db:           Session = Depends(get_db),
     current_user: User = Depends(require_auth),
 ):
-    """يُعطي رابط رفع مباشر للمتصفح (لـ R2) مع التحقق من الخطة."""
+    """يعطي presigned PUT URL للرفع المباشر من المتصفح مباشرةً إلى R2.
+
+    ملاحظة: R2 يدعم presigned PUT فقط. presigned POST (المستخدم سابقاً) يعيد 501 NotImplemented.
+    تحقيق حجم الملف يتم لاحقاً في /complete عبر head_object."""
     content_type = payload.content_type.split(";")[0].strip().lower()
     if content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="نوع المحتوى غير مدعوم")
+
+    # ── حراسة الحجم المعلن قبل إصدار الرابط ──
+    if payload.size > 0 and payload.size > settings.MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"حجم الملف المعلن ({payload.size:,} bytes) يتجاوز الحد الأقصى (2 GB)",
+        )
 
     # ── Enforce plan limits (SELECT FOR UPDATE) ──
     user_row = _select_for_update(db, "users", current_user.id)
@@ -475,11 +509,12 @@ def get_presigned_upload(
     video_id = str(uuid.uuid4())
     r2_key = f"users/{current_user.id}/videos/{video_id}/{video_id}.{ext}"
 
-    # ── Create pending video record ──
+    # ── Create pending video record (احتفظ بالحجم المعلن للمقارنة لاحقاً في /complete) ──
     video = Video(
         id=video_id,
         title=payload.title,
         file_path=r2_key,
+        file_size=payload.size if payload.size > 0 else None,  # declared size
         dialect=payload.dialect,
         owner_id=current_user.id,
         status="pending",
@@ -490,8 +525,16 @@ def get_presigned_upload(
     db.commit()
 
     store = storage()
-    result = store.get_presigned_upload_post(r2_key, content_type, settings.MAX_UPLOAD_BYTES)
-    return {"video_id": video_id, **result}
+    upload_url = store.presigned_put(r2_key, content_type, expires=900)
+
+    return {
+        "video_id": video_id,
+        "upload_url": upload_url,
+        "method": "PUT",
+        "headers": {"Content-Type": content_type},
+        "expires_in": 900,
+    }
+
 
 
 # ══════════════════════════════════════════════════════
@@ -515,42 +558,62 @@ def complete_upload(
     head = store.head_object(video.file_path)
     if not head:
         raise HTTPException(400, "الملف لم يتم رفعه بعد")
-    if head["size"] < 1024:
+
+    actual_size = head["size"]
+
+    if actual_size == 0:
         store.delete(video.file_path)
         db.delete(video)
         db.commit()
         raise HTTPException(400, "الملف فارغ أو تالف")
-    if head["size"] > settings.MAX_UPLOAD_BYTES:
+
+    if actual_size > settings.MAX_UPLOAD_BYTES:
+        # يجب حذف الكائن من R2 — هذه هي الحراسة الوحيدة ضد رفع ملفات ضخمة عبر presigned PUT
         store.delete(video.file_path)
         db.delete(video)
         db.commit()
-        raise HTTPException(413, "الملف أكبر من الحد المسموح")
+        raise HTTPException(413, "الملف أكبر من الحد المسموح (2 GB)")
 
-    video.file_size = head["size"]
-    video.status = "uploaded"
+    video.file_size = actual_size
+    video.status = "ready"
     db.commit()
 
-    # ── Trigger Celery tasks (HLS, thumbnail, transcription) ──
-    from app.worker import transcribe_task, hls_task, thumbnail_task
+    # ── Trigger Celery tasks via safe dispatch helper ──
+    from app.worker import transcribe_task, hls_task, thumbnail_task, dispatch
 
-    transcribe_task.delay(
-        video_id=video_id,
-        file_path=video.file_path,
-        r2_key=video.file_path,
-        language=video.dialect,
-    )
-    hls_task.delay(
-        video_id=video_id,
-        input_path=video.file_path,
-        r2_key=video.file_path,
-    )
-    thumbnail_task.delay(
-        video_id=video_id,
-        file_path=video.file_path,
-        r2_key=video.file_path,
-    )
+    dispatched = all([
+        dispatch(
+            transcribe_task,
+            video_id=video_id,
+            file_path=video.file_path,
+            r2_key=video.file_path,
+            language=video.dialect,
+        ),
+        dispatch(
+            hls_task,
+            video_id=video_id,
+            input_path=video.file_path,
+            r2_key=video.file_path,
+        ),
+        dispatch(
+            thumbnail_task,
+            video_id=video_id,
+            file_path=video.file_path,
+            r2_key=video.file_path,
+        ),
+    ])
 
-    return VideoResponse.model_validate(video)
+    if not dispatched:
+        transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+        if transcript:
+            transcript.status = TranscriptStatus.QUEUE_FAILED
+            db.commit()
+
+    response = VideoResponse.model_validate(video)
+    response.transcript_status = (
+        TranscriptStatus.PENDING if dispatched else TranscriptStatus.QUEUE_FAILED
+    )
+    return response
 
 
 # ══════════════════════════════════════════════════════

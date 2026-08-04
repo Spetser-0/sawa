@@ -102,5 +102,29 @@ The platform supports multiple Whisper models depending on your needs:
 
 ---
 
+## ☁️ Cloudflare R2 CORS Configuration
+
+To allow browser-direct presigned PUT uploads, the R2 bucket must have the following CORS policy applied via the Cloudflare dashboard (R2 → bucket → Settings → CORS):
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://<your-production-domain>",
+      "http://localhost:5173"
+    ],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+> **Important**: `PUT` must be in `AllowedMethods`. The previous implementation used `POST` (presigned POST), which R2 does not implement and returns `501 NotImplemented`.
+> Only `Content-Type` is needed in `AllowedHeaders` — any additional headers (Authorization, X-CSRF-Token, etc.) would break the presigned signature.
+
+---
+
 ## 📄 License
 This project is licensed under the MIT License.

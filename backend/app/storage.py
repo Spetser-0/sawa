@@ -24,13 +24,13 @@ class StorageBackend(ABC):
         ...
 
     @abstractmethod
-    def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
-        """أعد presigned URL + fields للرفع المباشر من المتصفح."""
+    def presigned_put(self, key: str, content_type: str, expires: int = 900) -> str:
+        """أعد presigned PUT URL للرفع المباشر من المتصفح."""
         ...
 
     @abstractmethod
-    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
-        """Presigned POST with content-length-range enforcement."""
+    def presigned_upload(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
+        """أعد presigned upload response with unified structure for both R2 and local."""
         ...
 
     @abstractmethod
@@ -86,11 +86,20 @@ class LocalStorage(StorageBackend):
                 f.write(chunk)
         return key
 
-    def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
-        return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
+    def presigned_put(self, key: str, content_type: str, expires: int = 900) -> str:
+        """لا يوجد تخزين سحابي محلياً — يُعاد رابط وهمي للاختبار."""
+        return f"/api/videos/upload-direct?key={key}"
 
-    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
-        return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
+    def presigned_upload(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
+        """LocalStorage doesn't use presigned URLs directly; return upload proxy endpoint."""
+        video_id = key.split("/")[-1].replace("." + content_type.split("/")[-1], "")
+        return {
+            "video_id": video_id,
+            "upload_url": f"/api/videos/upload-direct?key={key}",
+            "method": "POST",
+            "headers": {"Content-Type": "multipart/form-data"},
+            "expires_in": expires_in,
+        }
 
     def head_object(self, key: str) -> Optional[dict]:
         path = self._full_path(key)
@@ -145,29 +154,27 @@ class R2Storage(StorageBackend):
         self.client.upload_fileobj(file_obj, self.bucket, key, ExtraArgs={"ContentType": content_type}, Config=config)
         return key
 
-    def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
+    def presigned_put(self, key: str, content_type: str, expires: int = 900) -> str:
         """Presigned PUT URL for browser-direct upload to R2."""
-        url = self.client.generate_presigned_url(
+        return self.client.generate_presigned_url(
             "put_object",
             Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
             ExpiresIn=expires,
         )
-        return {"url": url, "fields": {"Content-Type": content_type}}
 
-    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
-        """Presigned POST with content-length-range enforced by R2."""
-        return self.client.generate_presigned_post(
-            Bucket=self.bucket,
-            Key=key,
-            Fields={"Content-Type": content_type},
-            Conditions=[
-                {"Content-Type": content_type},
-                ["content-length-range", 1, max_bytes],
-            ],
-            ExpiresIn=expires_in,
-        )
+    def presigned_upload(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
+        """Unified presigned upload endpoint - uses presigned PUT for R2."""
+        video_id = key.split("/")[-1].replace("." + content_type.split("/")[-1], "")
+        return {
+            "video_id": video_id,
+            "upload_url": self.presigned_put(key, content_type, expires_in),
+            "method": "PUT",
+            "headers": {"Content-Type": content_type},
+            "expires_in": expires_in,
+        }
 
     def head_object(self, key: str) -> Optional[dict]:
+        """Return size, content_type, etag for existing objects; None if missing."""
         try:
             r = self.client.head_object(Bucket=self.bucket, Key=key)
             return {

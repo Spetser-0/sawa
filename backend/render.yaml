@@ -41,6 +41,11 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
+      # ── Redis / Celery (REQUIRED in production) ──────────────────────────
+      # غياب هذا المتغير في خدمة الويب هو سبب الـ 500 بعد نجاح الرفع.
+      # يجب أن يشير إلى Redis instance على Render وليس localhost.
+      - key: REDIS_URL
+        sync: false          # أضفها من Redis service في Render (Internal URL)
 
     # قرص مستمر للملفات المؤقتة
     disk:

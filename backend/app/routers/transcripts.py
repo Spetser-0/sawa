@@ -130,16 +130,32 @@ def retry_transcription(
     transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
     if transcript.status == TranscriptStatus.PROCESSING:
         raise HTTPException(400, "التفريغ قيد المعالجة")
+
+    # السماح بإعادة المحاولة من: failed أو queue_failed
+    retryable = {TranscriptStatus.FAILED, TranscriptStatus.QUEUE_FAILED, TranscriptStatus.PENDING}
+    if transcript.status not in retryable:
+        raise HTTPException(400, f"لا يمكن إعادة المحاولة من الحالة: {transcript.status}")
+
     transcript.status = TranscriptStatus.PENDING
     transcript.error_message = None
     db.commit()
-    from app.worker import transcribe_task
-    transcribe_task.delay(
+
+    from app.worker import transcribe_task, dispatch
+    dispatched = dispatch(
+        transcribe_task,
         video_id=video_id,
         file_path=video.file_path,
+        r2_key=video.file_path,  # workers download from R2 if local path doesn't exist
         language=video.dialect if len(video.dialect) == 2 else "ar",
     )
+
+    if not dispatched:
+        transcript.status = TranscriptStatus.QUEUE_FAILED
+        db.commit()
+        return {"message": "فشل الاتصال بطابور المهام — حاول مجدداً لاحقاً", "status": "queue_failed"}
+
     return {"message": "تمت جدولة إعادة التفريغ", "status": "pending"}
+
 
 
 # ══════════════════════════════════════════════════════

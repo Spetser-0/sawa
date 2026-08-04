@@ -151,8 +151,13 @@ export const authAPI = {
 // ── Videos ───────────────────────────────────────────
 export const videosAPI = {
   /**
-   * Upload using Presigned URLs (Direct-to-R2)
-   * This is much more reliable for large files and works better on iOS.
+   * Upload using Presigned PUT URL (Direct-to-R2).
+   *
+   * R2 supports presigned PUT only — presigned POST returns 501 NotImplemented.
+   * The file bytes are sent directly (no FormData); only Content-Type header is
+   * set (any extra header would break the presigned signature).
+   *
+   * Falls back to proxy /upload only on network-level or CORS errors.
    */
   upload: async (
     file,
@@ -162,54 +167,85 @@ export const videosAPI = {
     onProgress,
     noiseReduction = false,
   ) => {
-    const presigned = await request("POST", "/videos/presigned-upload", {
-      filename: file.name,
-      content_type: file.type || "video/webm",
-      title,
-      dialect,
-    });
+    // ── Step 1: Get presigned PUT URL from backend ──
+    let presigned;
+    try {
+      presigned = await request("POST", "/videos/presigned-upload", {
+        filename: file.name,
+        content_type: file.type || "video/webm",
+        title,
+        dialect,
+        size: file.size,   // declared size for pre-issuance guard
+      });
+    } catch (presignedErr) {
+      // If presigned-upload endpoint itself fails, fall through to proxy
+      presigned = null;
+    }
 
-    const { url, fields, video_id } = presigned;
+    if (presigned && presigned.upload_url) {
+      const { upload_url, video_id, headers: r2Headers } = presigned;
+      const contentType = (r2Headers && r2Headers["Content-Type"]) || file.type || "video/webm";
 
-    return new Promise((resolve, reject) => {
-      const fd = new FormData();
-      for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-      fd.append("file", file);
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", upload_url);
 
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", url);
+        // Only set Content-Type — any other header breaks the presigned signature
+        xhr.setRequestHeader("Content-Type", contentType);
 
-      if (onProgress) {
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable)
-            onProgress(Math.round((e.loaded / e.total) * 100));
-        };
-      }
-
-      xhr.onload = async () => {
-        currentUpload = null;
-        if (xhr.status === 200 || xhr.status === 204) {
-          try {
-            await request("POST", `/videos/${video_id}/complete`);
-            const video = await videosAPI.getVideo(video_id);
-            resolve(video);
-          } catch (err) {
-            reject(err);
-          }
-        } else {
-          const msg = xhr.responseText || xhr.status;
-          reject(new Error(`فشل الرفع المباشر: ${msg}`));
+        if (onProgress) {
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable)
+              onProgress(Math.round((e.loaded / e.total) * 100));
+          };
         }
-      };
 
-      xhr.onerror = () => { currentUpload = null; reject(new Error("خطأ في الشبكة أثناء الرفع المباشر")); };
-      xhr.ontimeout = () => { currentUpload = null; reject(new Error("انتهت مهلة الرفع المباشر")); };
-      xhr.onabort = () => { currentUpload = null; reject(new Error("تم إلغاء الرفع")); };
+        xhr.onload = async () => {
+          currentUpload = null;
+          // R2 returns 200 or 204 on success
+          if (xhr.status === 200 || xhr.status === 204) {
+            try {
+              const result = await request("POST", `/videos/${video_id}/complete`);
+              resolve(result);
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            // R2 returned an HTTP error — do NOT call /complete
+            const errText = xhr.responseText || `HTTP ${xhr.status}`;
+            reject(new Error(`فشل الرفع المباشر إلى R2: ${errText}`));
+          }
+        };
 
-      xhr.timeout = 600000;
-      xhr.send(fd);
-      currentUpload = xhr;
-    });
+        xhr.onerror = async () => {
+          currentUpload = null;
+          // Network / CORS error — fall back to proxy upload
+          console.warn("Presigned PUT failed with network/CORS error, falling back to proxy upload");
+          try {
+            const proxyResult = await _proxyUpload(file, title, dialect, mode, onProgress, noiseReduction);
+            resolve(proxyResult);
+          } catch (proxyErr) {
+            reject(proxyErr);
+          }
+        };
+
+        xhr.ontimeout = () => {
+          currentUpload = null;
+          reject(new Error("انتهت مهلة الرفع المباشر (30 دقيقة)"));
+        };
+        xhr.onabort = () => {
+          currentUpload = null;
+          reject(new Error("تم إلغاء الرفع"));
+        };
+
+        xhr.timeout = 1800000; // 30 minutes
+        xhr.send(file);        // Send file bytes directly — no FormData
+        currentUpload = xhr;
+      });
+    }
+
+    // ── Fallback: proxy through backend /upload ──
+    return _proxyUpload(file, title, dialect, mode, onProgress, noiseReduction);
   },
 
   cancelUpload: () => {
@@ -232,6 +268,58 @@ export const videosAPI = {
   hlsUrl: (videoId) => `${API_BASE}/videos/${videoId}/hls/playlist.m3u8`,
   convertHls: (videoId) => request("POST", `/videos/${videoId}/hls/convert`),
 };
+
+/**
+ * Proxy upload — sends the file through the FastAPI backend (/api/videos/upload).
+ * Used as explicit fallback when presigned PUT fails with a network/CORS error.
+ */
+async function _proxyUpload(file, title, dialect, mode, onProgress, noiseReduction) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("title", title || "تسجيل جديد");
+    fd.append("dialect", dialect || "ar");
+    fd.append("mode", mode || "screen");
+    fd.append("noise_reduction", noiseReduction ? "true" : "false");
+
+    const token = getAuthToken();
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}/videos/upload`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable)
+          onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+
+    xhr.onload = async () => {
+      currentUpload = null;
+      if (xhr.status === 200 || xhr.status === 201) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("فشل تحليل استجابة الرفع"));
+        }
+      } else {
+        let msg = `HTTP ${xhr.status}`;
+        try { msg = JSON.parse(xhr.responseText).detail || msg; } catch {}
+        reject(new Error(`فشل الرفع عبر الخادم: ${msg}`));
+      }
+    };
+
+    xhr.onerror = () => { currentUpload = null; reject(new Error("خطأ في الشبكة أثناء الرفع")); };
+    xhr.ontimeout = () => { currentUpload = null; reject(new Error("انتهت مهلة الرفع (30 دقيقة)")); };
+    xhr.onabort = () => { currentUpload = null; reject(new Error("تم إلغاء الرفع")); };
+
+    xhr.timeout = 1800000; // 30 minutes
+    xhr.send(fd);
+    currentUpload = xhr;
+  });
+}
+
+
 
 // ── Transcripts ───────────────────────────────────────
 export const transcriptAPI = {

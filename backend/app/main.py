@@ -247,6 +247,27 @@ app.add_middleware(ErrorLoggerMiddleware)
 # ── Upload Dir (ensure exists) ────────────────────────
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
+
+def _sweep_stale_uploads():
+    """احذف الملفات في UPLOAD_DIR الأقدم من 6 ساعات عند بدء التشغيل.
+    يمنع تراكم ملفات tmp المؤقتة التي تسرّبت بسبب أخطاء سابقة."""
+    import time
+    cutoff = time.time() - 6 * 3600
+    try:
+        for fname in os.listdir(settings.UPLOAD_DIR):
+            fpath = os.path.join(settings.UPLOAD_DIR, fname)
+            if os.path.isfile(fpath) and os.path.getmtime(fpath) < cutoff:
+                try:
+                    os.remove(fpath)
+                    logger.info(f"🧹 Swept stale upload file: {fname}")
+                except Exception as e:
+                    logger.warning(f"Could not remove stale file {fname}: {e}")
+    except Exception as e:
+        logger.warning(f"Startup upload sweep failed: {e}")
+
+
+_sweep_stale_uploads()
+
 # ── Routers ───────────────────────────────────────────
 app.include_router(auth.router,        prefix="/api/auth",
                    tags=["Auth"])
@@ -272,3 +293,41 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/deps")
+def health_deps():
+    """يتحقق من توفر Redis و R2 وقاعدة البيانات ويُعيد حالة كل منهما.
+    مفيد للتشخيص السريع في الإنتاج بدلاً من قراءة السجلات."""
+    status = {"redis": False, "r2": False, "db": False}
+
+    # ── Redis ping ──
+    try:
+        import redis as redis_lib
+        r = redis_lib.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=2)
+        r.ping()
+        status["redis"] = True
+    except Exception as e:
+        logger.warning(f"health/deps: Redis ping failed: {e}")
+
+    # ── R2 / storage ping ──
+    try:
+        from app.storage import storage
+        store = storage()
+        # head_object on a sentinel key — returns None (not found) or metadata, both are fine
+        store.head_object("__health_check__")
+        status["r2"] = True
+    except Exception as e:
+        logger.warning(f"health/deps: R2/storage ping failed: {e}")
+
+    # ── DB ping ──
+    try:
+        from sqlalchemy import text as sa_text
+        from app.database import SessionLocal
+        with SessionLocal() as db_session:
+            db_session.execute(sa_text("SELECT 1"))
+        status["db"] = True
+    except Exception as e:
+        logger.warning(f"health/deps: DB ping failed: {e}")
+
+    return status

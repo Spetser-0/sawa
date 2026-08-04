@@ -13,41 +13,55 @@ os.environ["ENVIRONMENT"] = "test"
 
 from tests.conftest import client, auth_client, db_session
 from app.database import Video, SessionLocal
+import app.worker
 
 
 class TestPresignedUploadReturnsPostFields:
     def test_presigned_response_has_fields(self, auth_client):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "test.webm",
             "content_type": "video/webm",
             "title": "test video",
+            "dialect": "ar",
+            "size": 1024,
         })
         assert res.status_code == 200
         body = res.json()
         assert "video_id" in body
-        assert "url" in body
-        assert "fields" in body
+        assert "upload_url" in body
+        assert "method" in body
+        assert "headers" in body
+        assert body["method"] == "PUT"
 
     def test_rejects_unknown_content_type(self, auth_client):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "evil.exe",
             "content_type": "application/x-msdownload",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         assert res.status_code == 400
 
     def test_rejects_unknown_extension(self, auth_client):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "script.py",
             "content_type": "text/x-python",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         assert res.status_code == 400
 
 
 class TestCompleteValidatesObject:
     def test_complete_rejects_missing_object(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "test.webm",
             "content_type": "video/webm",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         video_id = res.json()["video_id"]
 
@@ -59,9 +73,12 @@ class TestCompleteValidatesObject:
             assert res2.status_code == 400
 
     def test_complete_rejects_oversize_object(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "huge.webm",
             "content_type": "video/webm",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         video_id = res.json()["video_id"]
 
@@ -78,9 +95,12 @@ class TestCompleteValidatesObject:
             assert video is None
 
     def test_complete_rejects_tiny_object(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "tiny.webm",
             "content_type": "video/webm",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         video_id = res.json()["video_id"]
 
@@ -93,9 +113,12 @@ class TestCompleteValidatesObject:
             assert res2.status_code == 400
 
     def test_complete_sets_file_size_and_status(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "good.webm",
             "content_type": "video/webm",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         video_id = res.json()["video_id"]
 
@@ -129,9 +152,12 @@ class TestPendingVideoPlanLimit:
             db_session.add(v)
         db_session.commit()
 
-        res = auth_client.post("/api/videos/presigned-upload", params={
+        res = auth_client.post("/api/videos/presigned-upload", json={
             "filename": "test.webm",
             "content_type": "video/webm",
+            "title": "test",
+            "dialect": "ar",
+            "size": 1024,
         })
         assert res.status_code == 200
 
