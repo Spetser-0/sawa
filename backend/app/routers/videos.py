@@ -146,19 +146,12 @@ class UnlockShareRequest(BaseModel):
 
 
 class PresignedUploadRequest(BaseModel):
- fix/upload-pipeline
-    filename:     str  = Field(..., min_length=1, max_length=255)
-    content_type: str  = "video/webm"
-    title:        str  = Field(default="تسجيل جديد", max_length=200)
-    dialect:      str  = Field(default="ar", max_length=10)
-    size:         int  = Field(default=0, ge=0)  # حجم الملف المعلن بالبايت — مطلوب لتفعيل الحراسة المسبقة
-
     filename:        str  = Field(..., min_length=1, max_length=255)
     content_type:    str  = "video/webm"
     title:           str  = Field(default="تسجيل جديد", max_length=200)
     dialect:         str  = Field(default="ar", max_length=10)
+    size:            int  = Field(default=0, ge=0)  # حجم الملف المعلن بالبايت — مطلوب لتفعيل الحراسة المسبقة
     noise_reduction: bool = False
- main
 
 
 # ══════════════════════════════════════════════════════
@@ -636,28 +629,9 @@ def complete_upload(
             transcript.status = TranscriptStatus.QUEUE_FAILED
             db.commit()
 
- fix/upload-pipeline
     response = VideoResponse.model_validate(video)
     response.transcript_status = (
         TranscriptStatus.PENDING if dispatched else TranscriptStatus.QUEUE_FAILED
-
-    transcribe_task.delay(
-        video_id=video_id,
-        file_path=video.file_path,
-        r2_key=video.file_path,
-        language=video.dialect,
-        noise_reduction=bool(video.noise_reduction),
-    )
-    hls_task.delay(
-        video_id=video_id,
-        input_path=video.file_path,
-        r2_key=video.file_path,
-    )
-    thumbnail_task.delay(
-        video_id=video_id,
-        file_path=video.file_path,
-        r2_key=video.file_path,
- main
     )
     return response
 
