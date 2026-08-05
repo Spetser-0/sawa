@@ -51,23 +51,30 @@ def _is_truly_public(video: Video) -> bool:
 
 
 # ── Magic bytes validation ─────────────────────────────
-MAGIC_SIGNATURES = {
-    b"\x1a\x45\xdf\xa3": "webm",
-    b"\x00\x00\x00\x1c": "mp4",
-    b"\x00\x00\x00\x20": "mp4",
-    b"\x00\x00\x00\x18": "mp4",
-    b"\x00\x00\x00\x14": "mp4",
-    b"\x52\x49\x46\x46": "avi",
-    b"\x1a\x45\xdf\xa3": "mkv",
-    b"\x49\x44\x33":      "mp3",
-    b"\xff\xfb":          "mp3",
-    b"\xff\xf3":          "mp3",
-    b"\xff\xf2":          "mp3",
-    b"\x52\x49\x46\x46":  "wav",
-    b"\x66\x4c\x61\x43":  "flac",
-    b"\x4f\x67\x67\x53":  "ogg",
-    b"\x00\x00\x00\x0c":  "m4a",
-}
+# ملاحظة: استخدمنا list of tuples بدلاً من dict لتجنب تضارب المفاتيح
+# webm و mkv يشتركان في نفس التوقيع EBML (\x1a\x45\xdf\xa3)
+MAGIC_SIGNATURES: list = [
+    # WebM / MKV — EBML header (MediaRecorder ينتج webm بهذا التوقيع دائماً)
+    (b"\x1a\x45\xdf\xa3", {"webm", "mkv"}),
+    # MP4 — توقيعات ftyp متعددة (iOS و Android)
+    (b"\x00\x00\x00\x1c", {"mp4", "m4a", "mov"}),
+    (b"\x00\x00\x00\x20", {"mp4", "m4a", "mov"}),
+    (b"\x00\x00\x00\x18", {"mp4", "m4a", "mov"}),
+    (b"\x00\x00\x00\x14", {"mp4", "m4a", "mov"}),
+    (b"\x00\x00\x00\x08", {"mp4", "m4a", "mov"}),
+    (b"\x00\x00\x00\x0c", {"mp4", "m4a", "mov"}),
+    # AVI / WAV — RIFF header
+    (b"\x52\x49\x46\x46", {"avi", "wav"}),
+    # MP3
+    (b"\x49\x44\x33",     {"mp3"}),
+    (b"\xff\xfb",         {"mp3"}),
+    (b"\xff\xf3",         {"mp3"}),
+    (b"\xff\xf2",         {"mp3"}),
+    # FLAC
+    (b"\x66\x4c\x61\x43", {"flac"}),
+    # OGG
+    (b"\x4f\x67\x67\x53", {"ogg"}),
+]
 
 ALLOWED_EXTENSIONS = {
     "mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac"
@@ -81,17 +88,31 @@ ALLOWED_UPLOAD_CONTENT_TYPES = {
 
 
 def _validate_file_magic(file_path: str, declared_ext: str) -> bool:
-    """Check file header bytes against declared extension."""
+    """
+    Check file header bytes against declared extension.
+
+    منطق التحقق:
+    1. إذا وجدنا توقيعاً معروفاً → نتحقق أن الامتداد ضمن مجموعة الامتدادات المتوافقة
+    2. إذا لم يتطابق أي توقيع → نتحقق من ftyp لـ MP4/MOV (خاصة iOS)
+    3. إذا لم يزل غير معروف → نسمح بالمرور (الامتداد تم فحصه مسبقاً)
+    """
     try:
         with open(file_path, "rb") as f:
             header = f.read(16)
         if len(header) < 4:
             return False
-        file_magic = header[:4]
-        for sig, fmt in MAGIC_SIGNATURES.items():
-            if file_magic == sig:
-                return fmt == declared_ext or declared_ext in ("mov", "mkv")
-        return True  # unknown magic — allow if extension was already checked
+
+        for sig, compatible_exts in MAGIC_SIGNATURES:
+            sig_len = len(sig)
+            if header[:sig_len] == sig:
+                return declared_ext in compatible_exts
+
+        # فحص خاص لـ MP4/MOV من iOS: البايتات 4-7 تحتوي على "ftyp"
+        if len(header) >= 8 and header[4:8] == b"ftyp":
+            return declared_ext in {"mp4", "m4a", "mov"}
+
+        # توقيع غير معروف — نسمح بالمرور إذا كان الامتداد صحيحاً
+        return True
     except Exception:
         return False
 
@@ -125,11 +146,19 @@ class UnlockShareRequest(BaseModel):
 
 
 class PresignedUploadRequest(BaseModel):
+ fix/upload-pipeline
     filename:     str  = Field(..., min_length=1, max_length=255)
     content_type: str  = "video/webm"
     title:        str  = Field(default="تسجيل جديد", max_length=200)
     dialect:      str  = Field(default="ar", max_length=10)
     size:         int  = Field(default=0, ge=0)  # حجم الملف المعلن بالبايت — مطلوب لتفعيل الحراسة المسبقة
+
+    filename:        str  = Field(..., min_length=1, max_length=255)
+    content_type:    str  = "video/webm"
+    title:           str  = Field(default="تسجيل جديد", max_length=200)
+    dialect:         str  = Field(default="ar", max_length=10)
+    noise_reduction: bool = False
+ main
 
 
 # ══════════════════════════════════════════════════════
@@ -515,6 +544,7 @@ def get_presigned_upload(
         dialect=payload.dialect,
         owner_id=current_user.id,
         status="pending",
+        noise_reduction=payload.noise_reduction,
     )
     db.add(video)
     transcript = Transcript(video_id=video_id)
@@ -606,9 +636,28 @@ def complete_upload(
             transcript.status = TranscriptStatus.QUEUE_FAILED
             db.commit()
 
+ fix/upload-pipeline
     response = VideoResponse.model_validate(video)
     response.transcript_status = (
         TranscriptStatus.PENDING if dispatched else TranscriptStatus.QUEUE_FAILED
+
+    transcribe_task.delay(
+        video_id=video_id,
+        file_path=video.file_path,
+        r2_key=video.file_path,
+        language=video.dialect,
+        noise_reduction=bool(video.noise_reduction),
+    )
+    hls_task.delay(
+        video_id=video_id,
+        input_path=video.file_path,
+        r2_key=video.file_path,
+    )
+    thumbnail_task.delay(
+        video_id=video_id,
+        file_path=video.file_path,
+        r2_key=video.file_path,
+ main
     )
     return response
 

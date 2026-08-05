@@ -118,6 +118,9 @@ class Video(Base):
     # ── الحالة ──────────────────────────────────────
     status = Column(String, default="uploaded")
 
+    # ── خيارات المعالجة ─────────────────────────────
+    noise_reduction = Column(Boolean, default=False)  # تنظيف الصوت بالذكاء الاصطناعي
+
     # ── البيانات الوصفية ─────────────────────────────
     views_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=_utcnow)
