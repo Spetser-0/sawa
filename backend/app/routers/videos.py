@@ -296,105 +296,102 @@ async def upload_video(
 
     # ── اكتب الملف محلياً (للخلفية) + ارفع إلى R2 إن وُجد ──
     tmp_path = file_path if not use_r2 else os.path.join(settings.UPLOAD_DIR, filename)
-    async with aiofiles.open(tmp_path, "wb") as buffer:
-        while chunk := await file.read(1024 * 1024):
-            total_bytes += len(chunk)
-            if total_bytes > max_bytes:
-                await buffer.close()
-                os.remove(tmp_path)
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"الملف أكبر من الحد الأقصى ({settings.MAX_FILE_SIZE_MB} ميجابايت)",
-                )
-            await buffer.write(chunk)
+    try:
+        async with aiofiles.open(tmp_path, "wb") as buffer:
+            while chunk := await file.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > max_bytes:
+                    await buffer.close()
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"الملف أكبر من الحد الأقصى ({settings.MAX_FILE_SIZE_MB} ميجابايت)",
+                    )
+                await buffer.write(chunk)
 
-    file_size = total_bytes
+        file_size = total_bytes
 
-    # ── Validate magic bytes ──
-    if not _validate_file_magic(tmp_path, ext):
-        os.remove(tmp_path)
-        raise HTTPException(
-            status_code=400,
-            detail="محتوى الملف لا يتوافق مع الامتداد المُصرّح",
+        # ── Validate magic bytes ──
+        if not _validate_file_magic(tmp_path, ext):
+            raise HTTPException(
+                status_code=400,
+                detail="محتوى الملف لا يتوافق مع الامتداد المُصرّح",
+            )
+
+        # ── ارفع إلى R2 (streaming) ──
+        if use_r2:
+            try:
+                with open(tmp_path, "rb") as f:
+                    store.put_streaming(r2_key, f, file.content_type or "application/octet-stream")
+            except Exception as e:
+                logger.error(f"R2 upload failed: {e}")
+                raise HTTPException(status_code=500, detail="فشل رفع الملف إلى التخزين السحابي")
+
+        video = Video(
+            id          = video_id,
+            title       = title,
+            description = description,
+            file_path   = file_path,
+            file_size   = file_size,
+            mime_type   = file.content_type,
+            dialect     = dialect,
+            owner_id    = current_user.id,
         )
+        db.add(video)
 
-    # ── ارفع إلى R2 (streaming) ──
-    if use_r2:
-        try:
-            with open(tmp_path, "rb") as f:
-                store.put_streaming(r2_key, f, file.content_type or "application/octet-stream")
-        except Exception as e:
-            logger.error(f"R2 upload failed: {e}")
-            if os.path.exists(tmp_path):
+        transcript = Transcript(video_id=video_id)
+        db.add(transcript)
+        db.commit()
+        db.refresh(video)
+
+        # ── Celery Tasks (via safe dispatch helper) ──
+        from app.worker import transcribe_task, hls_task, thumbnail_task, dispatch
+
+        # For R2 uploads, pass only the r2_key — tasks download from R2 into their own temp files.
+        task_file_path = r2_key if use_r2 else file_path
+
+        dispatched = all([
+            dispatch(
+                transcribe_task,
+                video_id=video_id,
+                file_path=task_file_path,
+                r2_key=r2_key,
+                language=dialect,
+                noise_reduction=noise_reduction,
+            ),
+            dispatch(
+                hls_task,
+                video_id=video_id,
+                input_path=task_file_path,
+                r2_key=r2_key,
+            ),
+            dispatch(
+                thumbnail_task,
+                video_id=video_id,
+                file_path=task_file_path,
+                r2_key=r2_key,
+            ),
+        ])
+
+        if not dispatched:
+            # الملف مخزّن، لكن Celery غير متاح — سجّل queue_failed حتى يتمكن المستخدم من إعادة المحاولة لاحقاً
+            from app.database import Transcript, TranscriptStatus
+            transcript_row = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+            if transcript_row:
+                transcript_row.status = TranscriptStatus.QUEUE_FAILED
+                db.commit()
+
+        response = VideoResponse.model_validate(video)
+        response.transcript_status = (
+            TranscriptStatus.PENDING if dispatched else TranscriptStatus.QUEUE_FAILED
+        )
+        return response
+    finally:
+        # ── احذف tmp_path بعد انتهاء التدفق (سواء نجح أو فشل) ──
+        if use_r2 and tmp_path and os.path.exists(tmp_path):
+            try:
                 os.remove(tmp_path)
-            raise HTTPException(status_code=500, detail="فشل رفع الملف إلى التخزين السحابي")
-
-    video = Video(
-        id          = video_id,
-        title       = title,
-        description = description,
-        file_path   = file_path,
-        file_size   = file_size,
-        mime_type   = file.content_type,
-        dialect     = dialect,
-        owner_id    = current_user.id,
-    )
-    db.add(video)
-
-    transcript = Transcript(video_id=video_id)
-    db.add(transcript)
-    db.commit()
-    db.refresh(video)
-
-    # ── احذف tmp_path بعد commit الناجح — المهام ستحمّل من R2 مباشرة ──
-    if use_r2 and tmp_path and os.path.exists(tmp_path):
-        try:
-            os.remove(tmp_path)
-        except Exception as cleanup_err:
-            logger.warning(f"Could not remove tmp_path after R2 upload: {cleanup_err}")
-
-    # ── Celery Tasks (via safe dispatch helper) ──
-    from app.worker import transcribe_task, hls_task, thumbnail_task, dispatch
-
-    # For R2 uploads, pass only the r2_key — tasks download from R2 into their own temp files.
-    task_file_path = r2_key if use_r2 else file_path
-
-    dispatched = all([
-        dispatch(
-            transcribe_task,
-            video_id=video_id,
-            file_path=task_file_path,
-            r2_key=r2_key,
-            language=dialect,
-            noise_reduction=noise_reduction,
-        ),
-        dispatch(
-            hls_task,
-            video_id=video_id,
-            input_path=task_file_path,
-            r2_key=r2_key,
-        ),
-        dispatch(
-            thumbnail_task,
-            video_id=video_id,
-            file_path=task_file_path,
-            r2_key=r2_key,
-        ),
-    ])
-
-    if not dispatched:
-        # الملف مخزّن، لكن Celery غير متاح — سجّل queue_failed حتى يتمكن المستخدم من إعادة المحاولة لاحقاً
-        from app.database import Transcript, TranscriptStatus
-        transcript_row = db.query(Transcript).filter(Transcript.video_id == video_id).first()
-        if transcript_row:
-            transcript_row.status = TranscriptStatus.QUEUE_FAILED
-            db.commit()
-
-    response = VideoResponse.model_validate(video)
-    response.transcript_status = (
-        TranscriptStatus.PENDING if dispatched else TranscriptStatus.QUEUE_FAILED
-    )
-    return response
+            except Exception as cleanup_err:
+                logger.warning(f"Could not remove tmp_path after upload flow: {cleanup_err}")
 
 
 def _run_hls_conversion(video_id: str, input_path: str, r2_key: str = None):
@@ -481,10 +478,10 @@ def get_presigned_upload(
         raise HTTPException(status_code=400, detail="نوع المحتوى غير مدعوم")
 
     # ── حراسة الحجم المعلن قبل إصدار الرابط ──
-    if payload.size > 0 and payload.size > settings.MAX_UPLOAD_BYTES:
+    if payload.size <= 0 or payload.size > settings.MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=f"حجم الملف المعلن ({payload.size:,} bytes) يتجاوز الحد الأقصى (2 GB)",
+            detail=f"حجم الملف المعلن ({payload.size:,} bytes) غير صالح أو يتجاوز الحد الأقصى (2 GB)",
         )
 
     # ── Enforce plan limits (SELECT FOR UPDATE) ──
