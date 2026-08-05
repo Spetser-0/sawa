@@ -151,7 +151,6 @@ export const authAPI = {
 // ── Videos ───────────────────────────────────────────
 export const videosAPI = {
   /**
- fix/upload-pipeline
    * Upload using Presigned PUT URL (Direct-to-R2).
    *
    * R2 supports presigned PUT only — presigned POST returns 501 NotImplemented.
@@ -159,10 +158,6 @@ export const videosAPI = {
    * set (any extra header would break the presigned signature).
    *
    * Falls back to proxy /upload only on network-level or CORS errors.
-
-   * Upload via backend proxy (avoids CORS issues with direct-to-R2).
-   * The backend streams the file to R2 server-side.
-main
    */
   upload: async (
     file,
@@ -172,7 +167,6 @@ main
     onProgress,
     noiseReduction = false,
   ) => {
- fix/upload-pipeline
     // ── Step 1: Get presigned PUT URL from backend ──
     let presigned;
     try {
@@ -206,23 +200,6 @@ main
           };
         }
 
-    return new Promise((resolve, reject) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("title", title || file.name || "تسجيل جديد");
-      fd.append("dialect", dialect);
-      fd.append("mode", mode);
-      fd.append("noise_reduction", noiseReduction ? "true" : "false");
-
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${API_BASE}/videos/upload`);
-
-      // Auth headers
-      const token = getAuthToken();
-      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-      if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
- main
-
         xhr.onload = async () => {
           currentUpload = null;
           // R2 returns 200 or 204 on success
@@ -240,7 +217,6 @@ main
           }
         };
 
- fix/upload-pipeline
         xhr.onerror = async () => {
           currentUpload = null;
           // Network / CORS error — fall back to proxy upload
@@ -270,52 +246,6 @@ main
 
     // ── Fallback: proxy through backend /upload ──
     return _proxyUpload(file, title, dialect, mode, onProgress, noiseReduction);
-
-      xhr.onload = async () => {
-        currentUpload = null;
-        if (xhr.status === 200 || xhr.status === 201) {
-          try {
-            const video = JSON.parse(xhr.responseText);
-            resolve(video);
-          } catch (err) {
-            reject(new Error("خطأ في تحليل استجابة الخادم"));
-          }
-        } else if (xhr.status === 401) {
-          // Try token refresh once
-          try {
-            const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-              method: "POST",
-              credentials: "include",
-              mode: "cors",
-              headers: token ? { "Authorization": `Bearer ${token}` } : {},
-            });
-            if (refreshRes.ok) {
-              const data = await refreshRes.json();
-              if (data.access_token) setAuthToken(data.access_token);
-              // Retry upload with new token
-              videosAPI.upload(file, title, dialect, mode, onProgress, noiseReduction)
-                .then(resolve).catch(reject);
-              return;
-            }
-          } catch { /* refresh failed */ }
-          reject(new Error("انتهت صلاحية الجلسة"));
-        } else {
-          let msg = "فشل رفع الملف";
-          try { msg = JSON.parse(xhr.responseText)?.detail || msg; } catch { /* ignore */ }
-          reject(new Error(`${msg} (كود: ${xhr.status})`));
-        }
-      };
-
-      xhr.onerror = () => { currentUpload = null; reject(new Error("خطأ في الشبكة أثناء الرفع")); };
-      xhr.ontimeout = () => { currentUpload = null; reject(new Error("انتهت مهلة الرفع")); };
-      xhr.onabort = () => { currentUpload = null; reject(new Error("تم إلغاء الرفع")); };
-
-      xhr.withCredentials = true;
-      xhr.timeout = 600000; // 10 minutes
-      xhr.send(fd);
-      currentUpload = xhr;
-    });
- main
   },
 
   cancelUpload: () => {
@@ -388,8 +318,6 @@ async function _proxyUpload(file, title, dialect, mode, onProgress, noiseReducti
     currentUpload = xhr;
   });
 }
-
-
 
 // ── Transcripts ───────────────────────────────────────
 export const transcriptAPI = {
