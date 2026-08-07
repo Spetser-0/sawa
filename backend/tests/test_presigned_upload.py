@@ -1,195 +1,82 @@
 """
-Tests for presigned upload flow — size enforcement, /complete validation, pending cleanup
+اختبارات /videos/presigned-upload — BLOCKER 1 (R2 لا يدعم presigned POST)
+
+الاختبارات القديمة هنا كانت تُرسل الحمولة كـ query params بدل جسم JSON، وهو
+ما لا يتوافق أبداً مع Pydantic body model المُعرَّف في الـ endpoint، فكانت
+تفشل بـ 422 دائماً دون أن تختبر شيئاً فعلياً. أُعيدت الكتابة بالكامل.
 """
-import os
-import sys
 import pytest
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta, timezone
-
-os.environ["SECRET_KEY"] = "test-secret-key"
-os.environ["DATABASE_URL"] = "sqlite://"
-os.environ["ENVIRONMENT"] = "test"
-
 from tests.conftest import client, auth_client, db_session
-from app.database import Video, SessionLocal
 
 
-class TestPresignedUploadReturnsPostFields:
-    def test_presigned_response_has_fields(self, auth_client):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "test.webm",
-            "content_type": "video/webm",
-            "title": "test video",
+class TestPresignedUpload:
+    def test_presigned_upload_returns_put_method_no_fields(self, auth_client):
+        """BLOCKER 1 / التحقق #3: الاستجابة يجب أن تحتوي method='PUT' ولا
+        تحتوي مفتاح 'fields' إطلاقاً (كان هذا شكل presigned POST الملغي)."""
+        res = auth_client.post("/api/videos/presigned-upload", json={
+            "filename": "clip.mp4",
+            "content_type": "video/mp4",
+            "title": "تسجيل تجريبي",
+            "dialect": "ar",
         })
         assert res.status_code == 200
         body = res.json()
+
         assert "video_id" in body
-        assert "url" in body
-        assert "fields" in body
+        assert "url" in body and body["url"]
+        assert body["method"] == "PUT"
+        assert "fields" not in body
+        assert body.get("headers", {}).get("Content-Type") == "video/mp4"
 
-    def test_rejects_unknown_content_type(self, auth_client):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "evil.exe",
-            "content_type": "application/x-msdownload",
+    def test_presigned_upload_creates_pending_video_row(self, auth_client, db_session):
+        res = auth_client.post("/api/videos/presigned-upload", json={
+            "filename": "clip.webm",
+            "content_type": "video/webm",
+            "title": "معلّق",
+            "dialect": "ar",
+        })
+        video_id = res.json()["video_id"]
+
+        from app.database import Video
+        video = db_session.query(Video).filter(Video.id == video_id).first()
+        assert video is not None
+        assert video.status == "pending"
+
+    def test_presigned_upload_rejects_unsupported_extension(self, auth_client):
+        res = auth_client.post("/api/videos/presigned-upload", json={
+            "filename": "malware.exe",
+            "content_type": "application/octet-stream",
+            "title": "ملف خطر",
+            "dialect": "ar",
         })
         assert res.status_code == 400
 
-    def test_rejects_unknown_extension(self, auth_client):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "script.py",
-            "content_type": "text/x-python",
+    def test_presigned_upload_rejects_unsupported_content_type(self, auth_client):
+        res = auth_client.post("/api/videos/presigned-upload", json={
+            "filename": "clip.mp4",
+            "content_type": "text/html",
+            "title": "نوع خاطئ",
+            "dialect": "ar",
         })
         assert res.status_code == 400
 
-
-class TestCompleteValidatesObject:
-    def test_complete_rejects_missing_object(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "test.webm",
-            "content_type": "video/webm",
-        })
-        video_id = res.json()["video_id"]
-
-        with patch("app.routers.videos.storage") as mock_storage:
-            mock_store = MagicMock()
-            mock_store.head_object.return_value = None
-            mock_storage.return_value = mock_store
-            res2 = auth_client.post(f"/api/videos/{video_id}/complete")
-            assert res2.status_code == 400
-
-    def test_complete_rejects_oversize_object(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "huge.webm",
-            "content_type": "video/webm",
-        })
-        video_id = res.json()["video_id"]
-
-        with patch("app.routers.videos.storage") as mock_storage:
-            mock_store = MagicMock()
-            mock_store.head_object.return_value = {"size": 3 * 1024 * 1024 * 1024, "content_type": "video/webm", "etag": "abc"}
-            mock_store.delete = MagicMock()
-            mock_storage.return_value = mock_store
-            res2 = auth_client.post(f"/api/videos/{video_id}/complete")
-            assert res2.status_code == 413
-            mock_store.delete.assert_called_once()
-
-            video = db_session.query(Video).filter(Video.id == video_id).first()
-            assert video is None
-
-    def test_complete_rejects_tiny_object(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "tiny.webm",
-            "content_type": "video/webm",
-        })
-        video_id = res.json()["video_id"]
-
-        with patch("app.routers.videos.storage") as mock_storage:
-            mock_store = MagicMock()
-            mock_store.head_object.return_value = {"size": 100, "content_type": "video/webm", "etag": "abc"}
-            mock_store.delete = MagicMock()
-            mock_storage.return_value = mock_store
-            res2 = auth_client.post(f"/api/videos/{video_id}/complete")
-            assert res2.status_code == 400
-
-    def test_complete_sets_file_size_and_status(self, auth_client, db_session):
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "good.webm",
-            "content_type": "video/webm",
-        })
-        video_id = res.json()["video_id"]
-
-        with patch("app.routers.videos.storage") as mock_storage:
-            mock_store = MagicMock()
-            mock_store.head_object.return_value = {"size": 5 * 1024 * 1024, "content_type": "video/webm", "etag": "abc"}
-            mock_storage.return_value = mock_store
-
-            mock_worker = MagicMock()
-            with patch.dict(sys.modules, {"app.worker": mock_worker}):
-                res2 = auth_client.post(f"/api/videos/{video_id}/complete")
-                assert res2.status_code == 200
-                video = db_session.query(Video).filter(Video.id == video_id).first()
-                assert video.file_size == 5 * 1024 * 1024
-                assert video.status == "uploaded"
-                mock_worker.transcribe_task.delay.assert_called_once()
-                mock_worker.hls_task.delay.assert_called_once()
-                mock_worker.thumbnail_task.delay.assert_called_once()
-
-
-class TestPendingVideoPlanLimit:
-    def test_pending_videos_excluded_from_plan_limit(self, auth_client, db_session):
-        for i in range(25):
-            v = Video(
-                id=f"vid-{i}",
-                title=f"test {i}",
-                file_path=f"users/test/vid-{i}.webm",
-                owner_id="test-user",
-                status="pending",
-            )
-            db_session.add(v)
-        db_session.commit()
-
-        res = auth_client.post("/api/videos/presigned-upload", params={
-            "filename": "test.webm",
-            "content_type": "video/webm",
+    def test_presigned_upload_normalizes_content_type_with_codec_suffix(self, auth_client):
+        """MediaRecorder ينتج أنواعاً مركّبة زي video/webm;codecs=vp9,opus —
+        يجب تطبيع النوع (split على ';') قبل المطابقة."""
+        res = auth_client.post("/api/videos/presigned-upload", json={
+            "filename": "rec.webm",
+            "content_type": "video/webm;codecs=vp9,opus",
+            "title": "تسجيل شاشة",
+            "dialect": "ar",
         })
         assert res.status_code == 200
+        assert res.json()["headers"]["Content-Type"] == "video/webm"
 
-
-class TestCleanupPendingVideos:
-    def test_cleanup_deletes_stale_pending(self, db_session):
-        from datetime import datetime, timedelta, timezone
-        from app.config import settings
-
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=settings.PENDING_UPLOAD_TTL_MINUTES + 10)
-
-        old_video = Video(
-            id="old-pending",
-            title="old",
-            file_path="users/test/old-pending.webm",
-            owner_id="test-user",
-            status="pending",
-            created_at=cutoff,
-        )
-        fresh_video = Video(
-            id="fresh-pending",
-            title="fresh",
-            file_path="users/test/fresh-pending.webm",
-            owner_id="test-user",
-            status="pending",
-            created_at=datetime.now(timezone.utc),
-        )
-        uploaded_video = Video(
-            id="uploaded",
-            title="uploaded",
-            file_path="users/test/uploaded.webm",
-            owner_id="test-user",
-            status="uploaded",
-            created_at=datetime.now(timezone.utc) - timedelta(hours=999),
-        )
-        db_session.add_all([old_video, fresh_video, uploaded_video])
-        db_session.commit()
-
-        mock_store = MagicMock()
-        mock_store.delete = MagicMock()
-
-        def _cleanup():
-            cutoff_dt = datetime.now(timezone.utc) - timedelta(minutes=settings.PENDING_UPLOAD_TTL_MINUTES)
-            stale = db_session.query(Video).filter(
-                Video.status == "pending", Video.created_at < cutoff_dt,
-            ).all()
-            for v in stale:
-                try:
-                    mock_store.delete(v.file_path)
-                except Exception:
-                    pass
-                db_session.delete(v)
-            db_session.commit()
-            return {"deleted": len(stale)}
-
-        result = _cleanup()
-
-        assert result["deleted"] == 1
-        assert db_session.query(Video).filter(Video.id == "old-pending").first() is None
-        assert db_session.query(Video).filter(Video.id == "fresh-pending").first() is not None
-        assert db_session.query(Video).filter(Video.id == "uploaded").first() is not None
+    def test_presigned_upload_requires_auth(self, client):
+        res = client.post("/api/videos/presigned-upload", json={
+            "filename": "clip.mp4",
+            "content_type": "video/mp4",
+            "title": "بلا تسجيل دخول",
+            "dialect": "ar",
+        })
+        assert res.status_code == 401

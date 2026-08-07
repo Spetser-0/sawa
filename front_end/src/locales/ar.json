@@ -107,6 +107,7 @@
     "changing": "جاري التغيير...",
     "error_wrong_password": "كلمة المرور غير صحيحة",
     "error_email_not_found": "لا يوجد حساب بهذا البريد",
+    "error_invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
     "error_email_exists": "البريد مسجل مسبقاً — سجّل الدخول بدلاً منه",
     "error_rate_limited": "محاولات كثيرة، انتظر دقيقة واحدة",
     "error_token_expired": "انتهت صلاحية جلستك — سجّل الدخول مجدداً",

@@ -272,3 +272,44 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/deps")
+def health_deps():
+    """يتحقق من صحة الاعتماديات الخارجية (DB, Redis, R2) دون تسريب أي بيانات
+    اعتماد — كل قيمة إما "ok" أو رسالة الخطأ فقط (بدون أسرار)."""
+    result = {"db": "ok", "redis": "ok", "r2": "ok"}
+
+    # ── قاعدة البيانات ──
+    try:
+        from app.database import engine
+        from sqlalchemy import text as _text
+        with engine.connect() as conn:
+            conn.execute(_text("SELECT 1"))
+    except Exception as e:
+        result["db"] = f"error: {e}"
+
+    # ── Redis (نفس عنوان Celery broker) ──
+    try:
+        import redis as _redis
+        r = _redis.from_url(settings.REDIS_URL, socket_connect_timeout=3)
+        r.ping()
+    except Exception as e:
+        result["redis"] = f"error: {e}"
+
+    # ── Cloudflare R2 ──
+    try:
+        r2_bucket = os.environ.get("R2_BUCKET_NAME")
+        if not r2_bucket:
+            result["r2"] = "not configured"
+        else:
+            from app.storage import storage
+            store = storage()
+            if hasattr(store, "client") and hasattr(store, "bucket"):
+                store.client.head_bucket(Bucket=store.bucket)
+            else:
+                result["r2"] = "not configured"
+    except Exception as e:
+        result["r2"] = f"error: {e}"
+
+    return result

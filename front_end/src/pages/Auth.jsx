@@ -24,8 +24,7 @@ export default function Auth() {
   const { t } = useTranslation();
 
   const ERROR_MESSAGES = {
-    "WRONG_PASSWORD": t("auth.error_wrong_password"),
-    "EMAIL_NOT_FOUND": t("auth.error_email_not_found"),
+    "INVALID_CREDENTIALS": t("auth.error_invalid_credentials"),
     "EMAIL_EXISTS": t("auth.error_email_exists"),
     "RATE_LIMITED": t("auth.error_rate_limited"),
     "TOKEN_EXPIRED": t("auth.error_token_expired"),

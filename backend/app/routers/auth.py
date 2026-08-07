@@ -35,6 +35,12 @@ from app.limiter import limiter
 
 router = APIRouter()
 
+# ── هاش وهمي ثابت (bcrypt لكلمة مرور عشوائية) — يُستخدم فقط لتشغيل
+#    verify_password عليه عند عدم وجود المستخدم، عشان زمن استجابة تسجيل
+#    الدخول ما يفرّقش بين "بريد غير موجود" و"كلمة مرور خاطئة" (منع
+#    user enumeration عبر التوقيت). القيمة نفسها لا تُستخدم لأي حساب حقيقي.
+_DUMMY_PASSWORD_HASH = "$2b$12$/KTTSmn6rgzo3EQZrdBoOeYlINoIkrSj2QCOhG1Br6jVkmBju2Pha"
+
 
 # ══════════════════════════════════════════════════════
 #  Schemas
@@ -86,8 +92,13 @@ class ResetPasswordRequest(BaseModel):
 # ══════════════════════════════════════════════════════
 #  مساعدات
 # ══════════════════════════════════════════════════════
-def _issue_tokens(response: Response, user: User):
-    """يُصدر توكنين (access + refresh) ويضبطهما كوكيز"""
+def _issue_tokens(response: Response, user: User) -> str:
+    """يُصدر توكنين (access + refresh)، يضبطهما كوكيز، ويُعيد توكن الوصول.
+
+    التوكن المُعاد يُستخدم لإدراجه في جسم استجابة /register و /login و
+    /refresh — بديل Bearer عندما تحجب سياسات ITP في iOS Safari الكوكيز
+    عبر-النطاقات (SameSite=None). توكن التحديث (refresh) لا يوضع أبداً في
+    الـ body — يبقى في كوكيز httpOnly فقط."""
     access_token = create_access_token({"sub": user.id})
     raw_refresh = create_refresh_token()
     refresh_hash = hash_token(raw_refresh)
@@ -109,6 +120,8 @@ def _issue_tokens(response: Response, user: User):
 
     set_auth_cookie(response, access_token)
     set_refresh_cookie(response, raw_refresh)
+
+    return access_token
 
 
 def _generate_otp() -> str:
@@ -146,7 +159,9 @@ def register(
 ):
     """
     تسجيل مستخدم جديد.
-    يُعيّد كوكيز httpOnly بدلاً من التوكن في الـ body.
+    يُعيّد كوكيز httpOnly + access_token في الـ body (بديل Bearer لـ iOS Safari
+    حيث تحجب سياسات ITP الكوكيز عبر-النطاقات). توكن التحديث يبقى في كوكيز
+    httpOnly فقط ولا يوضع أبداً في الـ body.
     """
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
@@ -165,8 +180,12 @@ def register(
     db.commit()
     db.refresh(user)
 
-    _issue_tokens(response, user)
-    return {"user": UserResponse.model_validate(user)}
+    access_token = _issue_tokens(response, user)
+    return {
+        "user": UserResponse.model_validate(user),
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
 
 
 # ══════════════════════════════════════════════════════
@@ -181,24 +200,38 @@ def login(
     db: Session = Depends(get_db),
 ):
     """
-    تسجيل الدخول — يُعيّد كوكيز httpOnly.
+    تسجيل الدخول — يُعيّد كوكيز httpOnly + access_token في الـ body.
+
+    ملاحظة أمنية: لا نُميّز بين "بريد غير موجود" و"كلمة مرور خاطئة" — كلاهما
+    يُعيد نفس الرسالة/الكود (INVALID_CREDENTIALS) بنفس زمن الاستجابة تقريباً
+    (عبر تشغيل verify_password على هاش وهمي عند عدم وجود المستخدم)، لمنع
+    تسريب وجود الحساب من عداد الأخطاء أو التوقيت.
     """
     user = db.query(User).filter(User.email == payload.email).first()
+
     if not user:
+        # شغّل verify_password على هاش وهمي حتى يتقارب زمن الاستجابة مع
+        # حالة "المستخدم موجود لكن كلمة المرور خاطئة"
+        verify_password(payload.password, _DUMMY_PASSWORD_HASH)
         raise APIException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="لا يوجد حساب بهذا البريد الإلكتروني",
-            error_code="EMAIL_NOT_FOUND",
+            detail="البريد الإلكتروني أو كلمة المرور غير صحيحة",
+            error_code="INVALID_CREDENTIALS",
         )
+
     if not verify_password(payload.password, user.hashed_password):
         raise APIException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="كلمة المرور غير صحيحة",
-            error_code="WRONG_PASSWORD",
+            detail="البريد الإلكتروني أو كلمة المرور غير صحيحة",
+            error_code="INVALID_CREDENTIALS",
         )
 
-    _issue_tokens(response, user)
-    return {"user": UserResponse.model_validate(user)}
+    access_token = _issue_tokens(response, user)
+    return {
+        "user": UserResponse.model_validate(user),
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
 
 
 # ══════════════════════════════════════════════════════
@@ -264,8 +297,12 @@ def refresh_token(
         raise APIException(status_code=401, detail="المستخدم غير موجود",
                             error_code="TOKEN_EXPIRED")
 
-    _issue_tokens(response, user)
-    return {"message": "تم تحديث التوكن بنجاح"}
+    access_token = _issue_tokens(response, user)
+    return {
+        "message": "تم تحديث التوكن بنجاح",
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
 
 
 # ══════════════════════════════════════════════════════

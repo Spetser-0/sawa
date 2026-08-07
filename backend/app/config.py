@@ -12,8 +12,11 @@ class Settings(BaseSettings):
 
     # ── التخزين ──────────────────────────────────────
     UPLOAD_DIR: str = "uploads"
-    MAX_FILE_SIZE_MB: int = 500
-    MAX_UPLOAD_BYTES: int = 2 * 1024 * 1024 * 1024   # 2 GB hard cap (enforced by R2 presigned POST)
+    # الحد الأقصى الموحّد لكل مسارات الرفع (proxy عبر /upload و direct عبر
+    # presigned PUT). R2 presigned PUT لا يدعم فرض حد على الحجم وقت الإصدار،
+    # لذلك يُفرض هذا الحد فعلياً في POST /videos/{id}/complete عبر head_object،
+    # وأيضاً أثناء البث في مسار /upload (proxy).
+    MAX_UPLOAD_BYTES: int = 2 * 1024 * 1024 * 1024   # 2 GB hard cap
     ALLOWED_EXTENSIONS: list = ["mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac"]
 
     # ── نموذج Whisper ────────────────────────────────

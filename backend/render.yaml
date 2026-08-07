@@ -27,6 +27,8 @@ services:
         sync: false          # ستضيفها يدوياً من Supabase
       - key: SECRET_KEY
         generateValue: true  # Render يولّدها تلقائياً
+      - key: REDIS_URL
+        sync: false          # نفس Redis instance المستخدم في sawa-celery-worker/beat — مطلوب حتى لا يسقط الـ web service إلى redis://localhost في الإنتاج
       - key: ANTHROPIC_API_KEY
         sync: false          # ستضيفها يدوياً
       - key: FRONTEND_URL

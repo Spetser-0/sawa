@@ -31,7 +31,22 @@ celery_app.conf.beat_schedule = {
         "task": "app.worker.cleanup_pending_videos",
         "schedule": crontab(minute="*/15"),
     },
+    "cleanup-orphan-temp-files": {
+        "task": "app.worker.cleanup_orphan_temp_files",
+        "schedule": crontab(minute=0),  # كل ساعة
+    },
 }
+
+
+def dispatch(task, **kwargs) -> bool:
+    """يرسل مهمة Celery بأمان — لا يرفع استثناء إذا كان الـ broker غير متاح،
+    حتى لا يفشل الطلب بـ 500 بعد نجاح الرفع فعلياً."""
+    try:
+        task.delay(**kwargs)
+        return True
+    except Exception as e:
+        logger.error(f"Celery dispatch failed for {task.name}: {e}")
+        return False
 
 @celery_app.task(name="app.worker.transcribe_task")
 def transcribe_task(video_id: str, file_path: str, language: str, noise_reduction: bool = False, r2_key: str = None):
@@ -61,10 +76,6 @@ def transcribe_task(video_id: str, file_path: str, language: str, noise_reductio
         transcript.processing_time   = result["processing_time"]
         transcript.status            = TranscriptStatus.DONE
         db.commit()
-
-        # Trigger auto-chapters
-        from app.routers.videos import _auto_generate_chapters
-        _auto_generate_chapters(video_id, transcript, db)
 
     except Exception as e:
         logger.error(f"Transcription task failed: {e}")
@@ -126,6 +137,31 @@ def thumbnail_task(video_id: str, file_path: str, r2_key: str = None):
         db.close()
         if tmp_file and os.path.exists(tmp_file):
             os.remove(tmp_file)
+
+
+@celery_app.task(name="app.worker.cleanup_orphan_temp_files")
+def cleanup_orphan_temp_files():
+    """يحذف الملفات المؤقتة الأقدم من 6 ساعات في UPLOAD_DIR — بقايا رفع فشلت
+    أو ملفات لم تُنظَّف بسبب انقطاع مفاجئ (crash) قبل الوصول لـ finally."""
+    from datetime import datetime, timedelta, timezone
+    cutoff_ts = (datetime.now(timezone.utc) - timedelta(hours=6)).timestamp()
+    deleted = 0
+    try:
+        if not os.path.isdir(settings.UPLOAD_DIR):
+            return {"deleted": 0}
+        for name in os.listdir(settings.UPLOAD_DIR):
+            path = os.path.join(settings.UPLOAD_DIR, name)
+            try:
+                if os.path.isfile(path) and os.path.getmtime(path) < cutoff_ts:
+                    os.remove(path)
+                    deleted += 1
+            except OSError as e:
+                logger.warning(f"Failed to remove orphan temp file {path}: {e}")
+        logger.info(f"Cleaned up {deleted} orphan temp file(s)")
+        return {"deleted": deleted}
+    except Exception as e:
+        logger.error(f"cleanup_orphan_temp_files failed: {e}")
+        return {"deleted": deleted, "error": str(e)}
 
 
 @celery_app.task(name="app.worker.cleanup_pending_videos")

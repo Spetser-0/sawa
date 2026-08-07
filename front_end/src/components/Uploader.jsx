@@ -4,7 +4,10 @@ import { UploadCloud, HardDrive, FolderOpen, CheckCircle2, X } from "lucide-reac
 import { videosAPI } from "../api/client";
 import { useToast } from "../components/ui/Toast";
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024;
+// يطابق backend/app/config.py::Settings.MAX_UPLOAD_BYTES — حد موحّد لكل
+// مسارات الرفع (presigned PUT المباشر و proxy). لو غيّرت القيمة في الباك
+// إند، حدّثها هنا كمان.
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [
   "mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "mkv", "ogg", "flac",
 ];

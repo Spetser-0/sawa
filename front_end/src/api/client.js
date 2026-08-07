@@ -71,7 +71,10 @@ async function request(
       body: isFormData ? body : body ? JSON.stringify(body) : undefined,
     });
 
-    if (path === "/auth/login" && res.ok) {
+    if (
+      (path === "/auth/login" || path === "/auth/register") &&
+      res.ok
+    ) {
       const data = await res.clone().json();
       if (data.access_token) setAuthToken(data.access_token);
     }
@@ -93,6 +96,8 @@ async function request(
           if (data.access_token) setAuthToken(data.access_token);
           return request(method, path, body, isFormData, true);
         }
+        // فشل التحديث — امسح التوكن القديم غير الصالح
+        localStorage.removeItem("sawa_token");
       } catch {
         /* refresh failed */
       }
@@ -151,8 +156,16 @@ export const authAPI = {
 // ── Videos ───────────────────────────────────────────
 export const videosAPI = {
   /**
-   * Upload using Presigned URLs (Direct-to-R2)
-   * This is much more reliable for large files and works better on iOS.
+   * Upload using a presigned PUT URL (Direct-to-R2).
+   *
+   * R2 does not implement presigned POST (returns 501 NotImplemented) — PUT
+   * is the only direct-upload mechanism, so the raw File bytes are sent with
+   * every header from `presigned.headers` applied (no FormData).
+   *
+   * Size can't be enforced by R2 at PUT time, so the backend enforces it
+   * (and validates real content via magic bytes) in POST /videos/{id}/complete.
+   * If anything fails after the video_id has been reserved, we best-effort
+   * DELETE it so no pending row is left orphaned.
    */
   upload: async (
     file,
@@ -169,15 +182,23 @@ export const videosAPI = {
       dialect,
     });
 
-    const { url, fields, video_id } = presigned;
+    const { url, method, headers, video_id } = presigned;
+
+    const cleanupOrphan = async () => {
+      try {
+        await videosAPI.deleteVideo(video_id);
+      } catch {
+        /* best-effort — لا يهم لو فشل الحذف */
+      }
+    };
 
     return new Promise((resolve, reject) => {
-      const fd = new FormData();
-      for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-      fd.append("file", file);
-
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", url);
+      xhr.open(method || "PUT", url);
+
+      for (const [key, value] of Object.entries(headers || {})) {
+        xhr.setRequestHeader(key, value);
+      }
 
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -190,24 +211,37 @@ export const videosAPI = {
         currentUpload = null;
         if (xhr.status === 200 || xhr.status === 204) {
           try {
-            await request("POST", `/videos/${video_id}/complete`);
-            const video = await videosAPI.getVideo(video_id);
-            resolve(video);
+            const result = await request("POST", `/videos/${video_id}/complete`);
+            resolve(result);
           } catch (err) {
+            await cleanupOrphan();
             reject(err);
           }
         } else {
-          const msg = xhr.responseText || xhr.status;
-          reject(new Error(`فشل الرفع المباشر: ${msg}`));
+          const errText = xhr.responseText || `HTTP ${xhr.status}`;
+          await cleanupOrphan();
+          reject(new Error(`فشل الرفع المباشر إلى R2: ${errText}`));
         }
       };
 
-      xhr.onerror = () => { currentUpload = null; reject(new Error("خطأ في الشبكة أثناء الرفع المباشر")); };
-      xhr.ontimeout = () => { currentUpload = null; reject(new Error("انتهت مهلة الرفع المباشر")); };
-      xhr.onabort = () => { currentUpload = null; reject(new Error("تم إلغاء الرفع")); };
+      xhr.onerror = async () => {
+        currentUpload = null;
+        await cleanupOrphan();
+        reject(new Error("خطأ في الشبكة أثناء الرفع المباشر"));
+      };
+      xhr.ontimeout = async () => {
+        currentUpload = null;
+        await cleanupOrphan();
+        reject(new Error("انتهت مهلة الرفع المباشر (30 دقيقة)"));
+      };
+      xhr.onabort = async () => {
+        currentUpload = null;
+        await cleanupOrphan();
+        reject(new Error("تم إلغاء الرفع"));
+      };
 
-      xhr.timeout = 600000;
-      xhr.send(fd);
+      xhr.timeout = 1800000; // 30 minutes
+      xhr.send(file); // البايتات الخام — لا FormData
       currentUpload = xhr;
     });
   },

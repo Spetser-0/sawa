@@ -25,12 +25,11 @@ class StorageBackend(ABC):
 
     @abstractmethod
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
-        """أعد presigned URL + fields للرفع المباشر من المتصفح."""
-        ...
+        """أعد presigned PUT URL للرفع المباشر من المتصفح.
 
-    @abstractmethod
-    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
-        """Presigned POST with content-length-range enforcement."""
+        ملاحظة: R2 لا يدعم presigned POST (يعيد 501 NotImplemented) — PUT هو
+        آلية الرفع المباشر الوحيدة. الحجم لا يمكن حراسته وقت الإصدار؛ التحقق
+        الفعلي من الحجم والمحتوى يتم في /videos/{id}/complete عبر head_object."""
         ...
 
     @abstractmethod
@@ -87,10 +86,11 @@ class LocalStorage(StorageBackend):
         return key
 
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
-        return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
-
-    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
-        return {"url": f"/api/videos/upload-direct?key={key}", "fields": {}}
+        return {
+            "url": f"/api/videos/upload-direct?key={key}",
+            "method": "PUT",
+            "headers": {"Content-Type": content_type},
+        }
 
     def head_object(self, key: str) -> Optional[dict]:
         path = self._full_path(key)
@@ -146,26 +146,18 @@ class R2Storage(StorageBackend):
         return key
 
     def get_presigned_upload_url(self, key: str, content_type: str, expires: int = 3600) -> dict:
-        """Presigned PUT URL for browser-direct upload to R2."""
+        """Presigned PUT URL for browser-direct upload to R2.
+
+        R2 does not implement presigned POST (returns 501 NotImplemented), so PUT
+        is the only direct-upload mechanism. Content-Length cannot be constrained
+        on a presigned PUT, so size enforcement happens afterwards in
+        POST /videos/{id}/complete via head_object."""
         url = self.client.generate_presigned_url(
             "put_object",
             Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
             ExpiresIn=expires,
         )
-        return {"url": url, "fields": {"Content-Type": content_type}}
-
-    def get_presigned_upload_post(self, key: str, content_type: str, max_bytes: int, expires_in: int = 900) -> dict:
-        """Presigned POST with content-length-range enforced by R2."""
-        return self.client.generate_presigned_post(
-            Bucket=self.bucket,
-            Key=key,
-            Fields={"Content-Type": content_type},
-            Conditions=[
-                {"Content-Type": content_type},
-                ["content-length-range", 1, max_bytes],
-            ],
-            ExpiresIn=expires_in,
-        )
+        return {"url": url, "method": "PUT", "headers": {"Content-Type": content_type}}
 
     def head_object(self, key: str) -> Optional[dict]:
         try:

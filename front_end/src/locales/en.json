@@ -107,6 +107,7 @@
     "changing": "Changing...",
     "error_wrong_password": "Wrong password",
     "error_email_not_found": "No account with this email",
+    "error_invalid_credentials": "Incorrect email or password",
     "error_email_exists": "Email already registered — please sign in instead",
     "error_rate_limited": "Too many attempts, wait one minute",
     "error_token_expired": "Session expired — please sign in again",

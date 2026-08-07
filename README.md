@@ -102,5 +102,29 @@ The platform supports multiple Whisper models depending on your needs:
 
 ---
 
+## 🌐 Cloudflare R2 — إعداد CORS (مطلوب للرفع المباشر presigned PUT)
+
+الرفع المباشر من المتصفح إلى R2 (presigned PUT) يحتاج قاعدة CORS على الـ
+bucket، وإلا سيرفض المتصفح الطلب. من لوحة تحكم Cloudflare R2 → اختر الـ
+bucket → **Settings → CORS Policy** → الصق القاعدة التالية (عدّل
+`AllowedOrigins` لو أضفت نطاقاً جديداً):
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://sawa-plum.vercel.app",
+      "http://localhost:5173"
+    ],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+---
+
 ## 📄 License
 This project is licensed under the MIT License.

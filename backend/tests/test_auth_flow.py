@@ -54,6 +54,51 @@ class TestRegisterLoginMeLogout:
         assert "sawa_access_token" in cookies
         assert "sawa_refresh" in cookies
 
+    def test_login_returns_access_token_in_body(self, client):
+        """BLOCKER 4: iOS Safari يحجب الكوكيز عبر-النطاقات (ITP) — لازم
+        access_token يرجع في جسم الاستجابة كبديل Bearer."""
+        client.post("/api/auth/register", json={
+            "name": "آيفون",
+            "email": "ios@test.com",
+            "password": "IosPass123!",
+        })
+        client.cookies.clear()
+        res = client.post("/api/auth/login", json={
+            "email": "ios@test.com",
+            "password": "IosPass123!",
+        })
+        assert res.status_code == 200
+        body = res.json()
+        assert "access_token" in body and body["access_token"]
+        assert body["token_type"] == "bearer"
+        assert "refresh" not in body  # التوكن الحساس يبقى في كوكيز httpOnly فقط
+
+    def test_register_returns_access_token_in_body(self, client):
+        res = client.post("/api/auth/register", json={
+            "name": "تسجيل",
+            "email": "register-token@test.com",
+            "password": "RegPass123!",
+        })
+        assert res.status_code == 201
+        body = res.json()
+        assert "access_token" in body and body["access_token"]
+        assert body["token_type"] == "bearer"
+
+    def test_bearer_header_works_without_cookies(self, client):
+        """يتحقق أن get_current_user يقبل Authorization: Bearer عند غياب
+        الكوكيز تماماً — وهو بالضبط سيناريو iOS Safari."""
+        res = client.post("/api/auth/register", json={
+            "name": "بيرر",
+            "email": "bearer@test.com",
+            "password": "BearerPass123!",
+        })
+        access_token = res.json()["access_token"]
+        client.cookies.clear()
+
+        res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+        assert res.status_code == 200
+        assert res.json()["email"] == "bearer@test.com"
+
     def test_logout_clears_cookies(self, client):
         client.post("/api/auth/register", json={
             "name": "خالد",
@@ -104,7 +149,17 @@ class TestRegisterLoginMeLogout:
             "password": "Wrong999!",
         })
         assert res.status_code == 401
-        assert res.json()["error_code"] == "WRONG_PASSWORD"
+        assert res.json()["error_code"] == "INVALID_CREDENTIALS"
+
+    def test_unknown_email_returns_same_error_code_as_wrong_password(self, client):
+        """Security 2: لا فرق في الرسالة أو الكود بين بريد غير موجود وكلمة
+        مرور خاطئة — يمنع اكتشاف وجود الحساب (user enumeration)."""
+        res = client.post("/api/auth/login", json={
+            "email": "does-not-exist@test.com",
+            "password": "Whatever123!",
+        })
+        assert res.status_code == 401
+        assert res.json()["error_code"] == "INVALID_CREDENTIALS"
 
 
 # ══════════════════════════════════════════════════════
@@ -253,6 +308,18 @@ class TestRefreshTokenRotation:
         assert token_record is not None
         assert token_record.revoked is True
         db.close()
+
+    def test_refresh_returns_access_token_in_body(self, client):
+        client.post("/api/auth/register", json={
+            "name": "توكن التحديث",
+            "email": "refresh-token@test.com",
+            "password": "Pass1234!",
+        })
+        res = client.post("/api/auth/refresh")
+        assert res.status_code == 200
+        body = res.json()
+        assert "access_token" in body and body["access_token"]
+        assert body["token_type"] == "bearer"
 
     def test_refresh_without_cookie_returns_401(self, client):
         client.post("/api/auth/register", json={

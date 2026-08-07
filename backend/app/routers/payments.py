@@ -5,6 +5,7 @@ import hmac
 import hashlib
 import json
 import base64
+import re
 import httpx
 import os
 from datetime import datetime, timedelta, timezone
@@ -167,30 +168,69 @@ async def create_payment(
             raise HTTPException(503, "انتهت مهلة الاتصال بـ Cryptomus")
 
 
+def _strip_sign_field(raw: bytes) -> Optional[bytes]:
+    """يحذف حقل 'sign' من نص JSON الخام دون إعادة تسلسل باقي الحقول — لتفادي
+    أي اختلاف في ترتيب المفاتيح، الفراغات، أو ترميز الأرقام/اليونيكود قد
+    يكسر التحقق من التوقيع (وهو بالضبط الخلل في التطبيق القديم الذي كان
+    يعيد بناء JSON من القاموس المُحلَّل بدل الاعتماد على البايتات الخام)."""
+    text = raw.decode("utf-8")
+    m = re.search(r'"sign"\s*:\s*"(?:[^"\\]|\\.)*"', text)
+    if not m:
+        return None
+    start, end = m.span()
+    before = text[:start].rstrip()
+    after = text[end:].lstrip()
+    if before.endswith(","):
+        before = before[:-1]
+    elif after.startswith(","):
+        after = after[1:]
+    return (before + after).encode("utf-8")
+
+
 # ══════════════════════════════════════════════════════
 #  POST /api/payments/webhook  — استقبال تأكيد الدفع
 # ══════════════════════════════════════════════════════
 @router.post("/webhook")
 async def payment_webhook(request: Request, db: Session = Depends(get_db)):
     """
-    Cryptomus يستدعي هذا الـ endpoint تلقائياً بعد أي دفع
-    """
-    body = await request.body()
-    data = await request.json()
+    Cryptomus يستدعي هذا الـ endpoint تلقائياً بعد أي دفع.
 
-    # ── التحقق من التوقيع الأمني ────────────────────
-    received_sign = data.pop("sign", "")
-    body_str      = base64.b64encode(json.dumps(data, separators=(",",":")).encode()).decode()
+    أمان: التوقيع يُحسب على البايتات الخام للطلب (بعد حذف حقل sign فقط)،
+    وليس على إعادة تسلسل القاموس المُحلَّل — لأن أي اختلاف بسيط في ترتيب
+    المفاتيح أو تنسيق الأرقام كان يكسر المقارنة سابقاً بشكل غير موثوق.
+    لا نُعالج أي بيانات من additional_data (مثل user_id) قبل التأكد من
+    صحة التوقيع أولاً.
+    """
+    if not CRYPTOMUS_API_KEY:
+        # عدم ضبط المفتاح لا يعني تخطي التحقق — يعني رفض الطلب بالكامل
+        raise HTTPException(503, "بوابة الدفع غير مُهيّأة على الخادم")
+
+    body = await request.body()
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        raise HTTPException(400, "جسم الطلب غير صالح")
+
+    received_sign = data.get("sign", "")
+    body_without_sign = _strip_sign_field(body)
+    if body_without_sign is None or not received_sign:
+        raise HTTPException(401, "توقيع مفقود")
+
+    body_str = base64.b64encode(body_without_sign).decode()
     expected_sign = hashlib.md5(f"{body_str}{CRYPTOMUS_API_KEY}".encode()).hexdigest()
 
-    if CRYPTOMUS_API_KEY and received_sign != expected_sign:
-        raise HTTPException(400, "توقيع غير صحيح")
+    if not hmac.compare_digest(received_sign, expected_sign):
+        raise HTTPException(401, "توقيع غير صحيح")
+
+    # ── من هنا فقط يُعتبر الطلب موثوقاً — التوقيع تحقق بنجاح ──
+    data.pop("sign", None)
 
     # ── تحقق من حالة الدفع ──────────────────────────
-    status = data.get("status", "")
-    if status not in ["paid", "paid_over"]:
+    pay_status = data.get("status", "")
+    if pay_status not in ["paid", "paid_over"]:
         # دفع ناقص أو في الانتظار — لا تفعّل الاشتراك
-        return {"message": f"الحالة: {status} — لم يُفعَّل الاشتراك بعد"}
+        return {"message": f"الحالة: {pay_status} — لم يُفعَّل الاشتراك بعد"}
 
     # ── استخرج بيانات المستخدم ──────────────────────
     try:
