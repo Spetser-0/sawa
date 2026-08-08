@@ -38,6 +38,11 @@ const ALLOWED_EXTENSIONS = ["mp4", "webm", "mov", "mp3", "wav", "m4a", "avi", "m
 const supportsDisplayMedia = typeof navigator !== "undefined" &&
   typeof navigator.mediaDevices?.getDisplayMedia === "function";
 
+// اكتشاف جهاز موبايل — يُستخدم لإظهار تنبيه الموبايل وزر تبديل الكاميرا
+// الأمامية/الخلفية (لا علاقة له بدعم تسجيل الشاشة أعلاه).
+const isMobile = typeof navigator !== "undefined" &&
+  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 export default function Recorder({ onUploadDone }) {
   const { t } = useTranslation();
   const [state, setState]       = useState("idle");
