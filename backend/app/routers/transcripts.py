@@ -137,13 +137,16 @@ def retry_transcription(
     transcript.status = TranscriptStatus.PENDING
     transcript.error_message = None
     db.commit()
-    from app.worker import transcribe_task
-    transcribe_task.delay(
+    from app.worker import transcribe_task, dispatch
+    dispatched = dispatch(
+        transcribe_task,
         video_id=video_id,
         file_path=video.file_path,
         language=video.dialect if len(video.dialect) == 2 else "ar",
     )
-    return {"message": "تمت جدولة إعادة التفريغ", "status": "pending"}
+    if not dispatched:
+        raise HTTPException(503, "تعذر جدولة إعادة التفريغ — طابور المعالجة غير متاح")
+    return {"message": "تمت جدولة إعادة التفريغ", "status": "pending", "task_id": dispatched.id}
 
 
 # ══════════════════════════════════════════════════════
@@ -256,12 +259,13 @@ def diarize_transcript(
     if transcript.status != TranscriptStatus.DONE:
         raise HTTPException(400, "التفريغ لم يكتمل بعد")
 
-    # Enqueue diarization task
-    from app.worker import diarize_task
+# Enqueue diarization task
+    from app.worker import diarize_task, dispatch
     r2_key = video.file_path if hasattr(storage(), "client") and hasattr(storage(), "bucket") else None
     
     try:
-        dispatched = diarize_task.delay(
+        dispatched = dispatch(
+            diarize_task,
             video_id=video_id,
             file_path=video.file_path,
             num_speakers=num_speakers,
@@ -327,16 +331,16 @@ def get_diarize_status(
     }
 
 
-# ══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 #  POST /api/transcripts/{video_id}/chapters  📑 Feature 2
-# ══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 @router.post("/{video_id}/chapters")
 def generate_chapters(
     video_id:     str,
     db:           Session        = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
-    """يُنشئ فصولاً ذكية من النص المفرَّغ باستخدام Claude"""
+    """يُنشئ فصولاً ذكية من النص المفرَّغ باستخدام Gemini"""
     transcript = _get_transcript_or_404(video_id, db, current_user)
 
     if transcript.status != TranscriptStatus.DONE:
@@ -345,49 +349,15 @@ def generate_chapters(
         raise HTTPException(400, "لا يوجد نص لإنشاء الفصول")
 
     try:
-        import anthropic
-        import os
-
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise HTTPException(500, "ANTHROPIC_API_KEY غير موجود")
-
+        from app.ai_services import generate_chapters
         segments = json.loads(transcript.segments_json) if transcript.segments_json else []
-        segments_text = "\n".join([
-            f"[{s.get('start', 0):.1f}s - {s.get('end', 0):.1f}s]: {s.get('text', '')}"
-            for s in segments
-        ])
-
-        prompt = f"""أنت مساعد ذكي. لديك نص مفرَّغ من تسجيل صوتي/فيديو.
-قم بتقسيمه إلى فصول (chapters) منطقية.
-
-أرجع JSON فقط بدون أي نص إضافي:
-{{"chapters": [{{"start": 0.0, "end": 120.5, "title": "عنوان الفصل", "summary": "ملخص الفصل في جملة"}}]}}
-
-- كل فصل يجب أن يكون منطقياً في المحتوى
-- العنوان بالعربية
-- استخدم الطوابع الزمنية الفعلية من النص
-- لا تُخترع توقيتاً غير موجود في النص
-
-النص:
-{segments_text[:8000]}"""
-
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        raw = message.content[0].text.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        chapters_data = json.loads(raw)
+        result = generate_chapters(transcript.full_text, segments, language=transcript.language_detected or "ar")
 
         # احفظ في قاعدة البيانات
-        transcript.chapters_json = json.dumps(chapters_data, ensure_ascii=False)
+        transcript.chapters_json = json.dumps(result, ensure_ascii=False)
         db.commit()
 
-        return chapters_data
+        return result
 
     except json.JSONDecodeError:
         raise HTTPException(500, "فشل تحليل استجابة الذكاء الاصطناعي")

@@ -38,15 +38,15 @@ celery_app.conf.beat_schedule = {
 }
 
 
-def dispatch(task, **kwargs) -> bool:
+def dispatch(task, **kwargs):
     """يرسل مهمة Celery بأمان — لا يرفع استثناء إذا كان الـ broker غير متاح،
-    حتى لا يفشل الطلب بـ 500 بعد نجاح الرفع فعلياً."""
+    حتى لا يفشل الطلب بـ 500 بعد نجاح الرفع فعلياً.
+    Returns the Celery result object on success, None on failure."""
     try:
-        task.delay(**kwargs)
-        return True
+        return task.delay(**kwargs)
     except Exception as e:
         logger.error(f"Celery dispatch failed for {task.name}: {e}")
-        return False
+        return None
 
 
 def _update_transcript_status(db, video_id: str, status: TranscriptStatus, **kwargs):

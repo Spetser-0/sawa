@@ -26,7 +26,6 @@ requests
 sentry-sdk[fastapi]
 celery
 redis
-anthropic
 python-magic
 
 # Optional ML dependencies (alignment/diarization) - install separately:

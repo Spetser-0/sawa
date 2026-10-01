@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta, timezone
 import aiofiles
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Request, Header
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
@@ -19,7 +19,7 @@ from app.limiter import limiter
 
 from app.database import get_db, Video, Transcript, TranscriptStatus, User
 from app.exceptions import APIException
-from app.auth import get_current_user, require_auth, hash_password, verify_password, create_share_token
+from app.auth import get_current_user, require_auth, hash_password, verify_password, create_share_token, verify_share_token
 from app.config import settings
 from app.transcription import transcribe_audio, extract_audio_if_needed, denoise_audio
 from app.storage import storage
@@ -552,13 +552,14 @@ def get_video_by_share_token(
     return r
 
 
-# ══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 #  GET /api/videos/share/{token}/stream
-# ══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
 @router.get("/share/{token}/stream")
 def stream_video_by_share_token(
     token: str,
     password: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     video = db.query(Video).filter(Video.share_token == token).first()
@@ -568,11 +569,25 @@ def stream_video_by_share_token(
     if video.share_expires_at and video.share_expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=410, detail="انتهت صلاحية رابط المشاركة")
 
+    # Check if video is password protected
     if video.share_password_hash:
-        if not password:
-            raise HTTPException(status_code=401, detail="يتطلب كلمة مرور")
-        if not verify_password(password, video.share_password_hash):
-            raise HTTPException(status_code=401, detail="كلمة المرور غير صحيحة")
+        # Try Bearer token first
+        bearer_token = None
+        if authorization and authorization.startswith("Bearer "):
+            bearer_token = authorization[7:]  # Remove "Bearer " prefix
+            if verify_share_token(bearer_token, video.id):
+                # Valid share token - grant access
+                pass
+            else:
+                # Invalid share token, fall through to password check
+                bearer_token = None
+
+        # If no valid Bearer token, require password
+        if not bearer_token:
+            if not password:
+                raise HTTPException(status_code=401, detail="يتطلب كلمة مرور أو توكن مشاركة صالح")
+            if not verify_password(password, video.share_password_hash):
+                raise HTTPException(status_code=401, detail="كلمة المرور غير صحيحة")
 
     # ── R2: أعد تحويلة إلى presigned URL ──
     store = storage()
@@ -777,14 +792,18 @@ def trigger_hls_conversion(
     store = storage()
     input_path = store.get_local_path(video.file_path) or video.file_path
 
-    from app.worker import hls_task
-    hls_task.delay(
+    from app.worker import hls_task, dispatch
+
+    dispatched = dispatch(
+        hls_task,
         video_id=video_id,
         input_path=input_path,
         r2_key=video.file_path if not store.get_local_path(video.file_path) else None,
     )
+    if not dispatched:
+        raise HTTPException(503, "تعذر جدولة تحويل HLS — طابور المعالجة غير متاح")
 
-    return {"message": "بدأ التحويل إلى HLS في الخلفية"}
+    return {"message": "بدأ التحويل إلى HLS في الخلفية", "task_id": dispatched.id}
 
 
 # ══════════════════════════════════════════════════════

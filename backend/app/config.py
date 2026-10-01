@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
     ENVIRONMENT: str = "development"
 
+    # ── Demo Payments (Security) ─────────────────────
+    ENABLE_DEMO_PAYMENTS: bool = False
+
     # ── Celery & Redis ──────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: Optional[str] = None

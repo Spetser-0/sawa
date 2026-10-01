@@ -270,10 +270,10 @@ def demo_activate(
 ):
     """
     تفعيل اشتراك تجريبي بدون دفع فعلي — للتطوير فقط
-    احذف هذا الـ endpoint قبل الإنتاج!
+    يتطلب ENABLE_DEMO_PAYMENTS=1 في متغيرات البيئة.
     """
-    if os.getenv("ENVIRONMENT") == "production":
-        raise HTTPException(403, "غير متاح في الإنتاج")
+    if os.getenv("ENABLE_DEMO_PAYMENTS") != "1":
+        raise HTTPException(403, "التفعيل التجريبي غير متاح")
 
     if plan not in PLANS:
         raise HTTPException(400, "خطة غير صحيحة")

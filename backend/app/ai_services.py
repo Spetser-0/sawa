@@ -244,3 +244,45 @@ def merge_diarization_with_transcript(
         })
 
     return merged
+
+
+# ═══════════════════════════════════════════════════════
+#  إنشاء فصول ذكية (Smart Chapters) باستخدام Gemini
+# ═══════════════════════════════════════════════════════
+def generate_chapters(full_text: str, segments: list, language: str = "ar") -> dict:
+    """
+    يُنشئ فصولاً ذكية من النص المفرَّغ باستخدام Gemini.
+    """
+    model = get_gemini()
+
+    lang_instruction = "باللغة العربية" if language == "ar" else "in English"
+
+    segments_text = "\n".join([
+        f"[{s.get('start', 0):.1f}s - {s.get('end', 0):.1f}s]: {s.get('text', '')}"
+        for s in segments
+    ])
+
+    prompt = f"""أنت مساعد ذكي. لديك نص مفرَّغ من تسجيل صوتي/فيديو.
+قم بتقسيمه إلى فصول (chapters) منطقية {lang_instruction}.
+
+أرجع JSON فقط بهذا الشكل بالضبط بدون أي نص إضافي:
+{{"chapters": [{{"start": 0.0, "end": 120.5, "title": "عنوان الفصل", "summary": "ملخص الفصل في جملة"}}]}}
+
+- كل فصل يجب أن يكون منطقياً في المحتوى
+- العنوان {lang_instruction}
+- استخدم الطوابع الزمنية الفعلية من النص
+- لا تُخترع توقيتاً غير موجود في النص
+
+النص:
+{segments_text[:8000]}"""
+
+    response = model.generate_content(prompt)
+
+    raw = response.text.strip()
+    raw = raw.replace("```json", "").replace("```", "").strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        # Fallback: return empty chapters on parse failure
+        return {"chapters": []}
