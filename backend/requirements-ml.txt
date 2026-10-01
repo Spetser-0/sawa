@@ -11,6 +11,3 @@ torch --index-url https://download.pytorch.org/whl/cpu
 
 # Torchaudio for audio processing
 torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# pyannote.audio for speaker diarization (requires HuggingFace token)
-# pyannote.audio

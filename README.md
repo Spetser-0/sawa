@@ -75,6 +75,42 @@ sawa/
 
 ---
 
+## 🧠 AI Features: Alignment & Diarization (Optional)
+
+The platform supports optional advanced AI features that require additional dependencies:
+
+### Word-Level Alignment (WhisperX)
+Provides word-level timestamps for transcript review.
+```bash
+pip install -r backend/requirements-ml.txt
+```
+**Requirements:**
+- CPU: ~2GB RAM, ~5GB disk space
+- GPU (optional): CUDA 11.8+, ~8GB VRAM for faster alignment
+- Set `ALIGNMENT_PROVIDER=whisperx` in `.env` to enable
+
+### Speaker Diarization (pyannote.audio)
+Identifies speakers in multi-speaker recordings.
+```bash
+pip install -r backend/requirements-diarization.txt
+```
+**Requirements:**
+- **HuggingFace Account Required:** Create account at [huggingface.co](https://huggingface.co)
+- **Model Access:** Accept terms for [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
+- **HuggingFace Token:** Add `HUGGINGFACE_TOKEN=your_token` to `.env`
+- CPU: ~4GB RAM, ~8GB disk space (model cache)
+- GPU (recommended): CUDA 11.8+, ~8GB VRAM
+- Set `DIARIZATION_ENABLED=true` in `.env` to enable
+
+**Hardware Limitations:**
+- CPU-only diarization is ~10-20x slower than GPU
+- Audio longer than 30 minutes may exceed memory on CPU
+- Concurrent diarization jobs not recommended on CPU-only instances
+
+**Model Terms:** By using pyannote.audio, you agree to [pyannote's model license](https://huggingface.co/pyannote/speaker-diarization-3.1) which restricts commercial use.
+
+---
+
 ## 🔌 API Overview
 
 ### Authentication

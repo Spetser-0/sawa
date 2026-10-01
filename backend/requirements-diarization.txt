@@ -1,0 +1,15 @@
+# Speaker Diarization Dependencies
+# Install separately when speaker diarization is needed
+# pip install -r requirements-diarization.txt
+
+# pyannote.audio for speaker diarization (requires HuggingFace token)
+# Model: pyannote/speaker-diarization-3.1
+# Requires: HuggingFace account + accept model terms at https://huggingface.co/pyannote/speaker-diarization-3.1
+pyannote.audio
+
+# PyTorch (required by pyannote.audio) - CPU version
+# For GPU: torch --index-url https://download.pytorch.org/whl/cu118
+torch --index-url https://download.pytorch.org/whl/cpu
+
+# Torchaudio for audio processing
+torchaudio --index-url https://download.pytorch.org/whl/cpu
