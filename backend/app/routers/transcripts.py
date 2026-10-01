@@ -134,6 +134,8 @@ def retry_transcription(
     transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
     if transcript.status == TranscriptStatus.PROCESSING:
         raise HTTPException(400, "التفريغ قيد المعالجة")
+    previous_status = transcript.status
+    previous_error_message = transcript.error_message
     transcript.status = TranscriptStatus.PENDING
     transcript.error_message = None
     db.commit()
@@ -145,6 +147,9 @@ def retry_transcription(
         language=video.dialect if len(video.dialect) == 2 else "ar",
     )
     if not dispatched:
+        transcript.status = previous_status
+        transcript.error_message = previous_error_message
+        db.commit()
         raise HTTPException(503, "تعذر جدولة إعادة التفريغ — طابور المعالجة غير متاح")
     return {"message": "تمت جدولة إعادة التفريغ", "status": "pending", "task_id": dispatched.id}
 
