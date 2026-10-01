@@ -28,4 +28,6 @@ celery
 redis
 anthropic
 python-magic
-whisperx
+
+# Optional ML dependencies (alignment/diarization) - install separately:
+# pip install -r requirements-ml.txt

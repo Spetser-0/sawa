@@ -175,7 +175,6 @@ class Transcript(Base):
 
     # ── اللهجة والمصطلحات ──────────────────────────────
     dialect_selected = Column(String, nullable=True)    # اللهجة المختارة من المستخدم
-    language_detected = Column(String, nullable=True)   # اللغة المكتشفة (من الموفر)
     terminology_applied = Column(Boolean, default=False) # هل تم تطبيق تصحيحات المصطلحات
     terminology_dictionary_used = Column(Text, nullable=True) # القاموس المستخدم (JSON)
 

@@ -1,0 +1,16 @@
+# Machine Learning / Heavy Dependencies
+# Install separately when ML alignment/diarization is needed
+# pip install -r requirements-ml.txt
+
+# WhisperX for word-level alignment
+whisperx
+
+# PyTorch (required by whisperx) - CPU version
+# For GPU: torch --index-url https://download.pytorch.org/whl/cu118
+torch --index-url https://download.pytorch.org/whl/cpu
+
+# Torchaudio for audio processing
+torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# pyannote.audio for speaker diarization (requires HuggingFace token)
+# pyannote.audio
