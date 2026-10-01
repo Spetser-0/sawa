@@ -19,7 +19,7 @@ from app.limiter import limiter
 
 from app.database import get_db, Video, Transcript, TranscriptStatus, User
 from app.exceptions import APIException
-from app.auth import get_current_user, require_auth, hash_password, verify_password
+from app.auth import get_current_user, require_auth, hash_password, verify_password, create_share_token
 from app.config import settings
 from app.transcription import transcribe_audio, extract_audio_if_needed, denoise_audio
 from app.storage import storage
@@ -649,11 +649,7 @@ def unlock_shared_video(
     if not verify_password(data.password, video.share_password_hash):
         raise APIException(401, "كلمة المرور غير صحيحة", error_code="WRONG_PASSWORD")
 
-    from app.auth import create_access_token
-    access_token = create_access_token(
-        {"sub": video.owner_id or "guest", "video_id": video.id, "type": "share_access"},
-        timedelta(hours=1),
-    )
+    access_token = create_share_token(video.id, timedelta(hours=1))
     video.views_count += 1
     db.commit()
 
