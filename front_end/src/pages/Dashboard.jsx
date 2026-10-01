@@ -27,10 +27,10 @@ export default function Dashboard() {
   const toast = useToast();
 
   const STATUS_MAP = {
-    pending:    { label: t("dashboard.status_pending"),    color: "#FCD34D" },
-    processing: { label: t("dashboard.status_processing"), color: "#818CF8" },
-    done:       { label: t("dashboard.status_done"),       color: "#34D399" },
-    failed:     { label: t("dashboard.status_failed"),     color: "#F87171" },
+    pending:    { label: t("dashboard.status_pending"),    color: "#ffedd7" },
+    processing: { label: t("dashboard.status_processing"), color: "#6c5f51" },
+    done:       { label: t("dashboard.status_done"),       color: "#ffedd7" },
+    failed:     { label: t("dashboard.status_failed"),     color: "#dc5000" },
   };
 
   function formatSize(bytes) {

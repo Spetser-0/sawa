@@ -1,3 +1,4 @@
+@import "./design/variables.css";
 /* ════════════════════════════════════════════════════════
    سوى — Design System v2
    نظام تصميم موحد: متغيرات، مكونات، أدوات، تجاوب كامل
@@ -6,53 +7,68 @@
 /* ── Reset ──────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  /* الألوان الأساسية */
-  --green:        #34D399;
-  --green-dark:   #059669;
-  --green-glow:   rgba(52, 211, 153, 0.25);
-  --purple:       #818CF8;
-  --blue:         #60A5FA;
-  --pink:         #F472B6;
-  --violet:       #C084FC;
-  --amber:        #F59E0B;
-  --red:          #F87171;
-  --yellow:       #FCD34D;
+ :root {
+  /* ORYZO / Sawa editorial palette */
+  --color-warm-cream: #ffedd7;
+  --color-walnut-shadow: #100904;
+  --color-bark-brown: #382416;
+  --color-cork-border: #40372e;
+  --color-driftwood: #6c5f51;
+  --color-ember-accent: #dc5000;
+  --color-pure-black: #100904;
 
-  /* الخلفيات والحدود */
-  --bg:           #06060e;
-  --bg-card:      #0d0d1a;
-  --bg-elevated:  #11111f;
-  --bg-hover:     #13132a;
-  --border:       #1e1e30;
-  --border-hover: #2c2c48;
+  --font-halyard-display-variable: 'halyard-display-variable', Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-arial: Arial, ui-sans-serif, system-ui, sans-serif;
 
-  /* النصوص */
-  --text:         #e8e8f2;
-  --text-secondary: #9ca3af;
-  --text-muted:   #6b7280;
-  --text-faint:   #4b5563;
+  --text-subheading: 18px;
+  --leading-subheading: 1;
+  --text-heading-sm: 24px;
+  --leading-heading-sm: 1.09;
+  --text-body: 29px;
+  --leading-body: 1.26;
+  --text-heading: 41px;
+  --leading-heading: 0.9;
+  --text-display: 51px;
+  --leading-display: 0.9;
 
-  /* الأبعاد */
-  --radius-lg:    20px;
-  --radius:       14px;
-  --radius-sm:    10px;
-  --radius-xs:    8px;
+  --spacing-6: 6px; --spacing-8: 8px; --spacing-9: 9px; --spacing-10: 10px;
+  --spacing-12: 12px; --spacing-14: 14px; --spacing-18: 18px; --spacing-24: 24px;
+  --spacing-31: 31px; --spacing-41: 41px; --spacing-45: 45px; --spacing-68: 68px; --spacing-204: 204px;
+  --radius-xl: 12px; --radius-2xl: 22.5px; --radius-3xl: 36px; --radius-full: 9999px;
 
-  /* الظلال */
-  --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md:    0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg:    0 24px 60px rgba(0, 0, 0, 0.5);
-  --shadow-glow:  0 0 24px var(--green-glow);
-
-  /* الخط */
-  --font: 'IBM Plex Sans Arabic', 'Segoe UI', system-ui, Arial, sans-serif;
-
-  /* الحركة */
+  /* Compatibility aliases used by existing components */
+  --green: var(--color-warm-cream);
+  --green-dark: var(--color-bark-brown);
+  --green-glow: rgba(255, 237, 215, 0.14);
+  --purple: var(--color-driftwood);
+  --blue: var(--color-warm-cream);
+  --pink: var(--color-ember-accent);
+  --violet: var(--color-driftwood);
+  --amber: var(--color-ember-accent);
+  --red: var(--color-ember-accent);
+  --yellow: var(--color-warm-cream);
+  --bg: var(--color-walnut-shadow);
+  --bg-card: #1b100a;
+  --bg-elevated: var(--color-bark-brown);
+  --bg-hover: #49301f;
+  --border: var(--color-cork-border);
+  --border-hover: var(--color-driftwood);
+  --text: var(--color-warm-cream);
+  --text-secondary: #d8c5ae;
+  --text-muted: var(--color-driftwood);
+  --text-faint: #5b4b3c;
+  --radius-lg: var(--radius-3xl);
+  --radius: var(--radius-xl);
+  --radius-sm: var(--radius-2xl);
+  --radius-xs: 10px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-glow: none;
+  --font: var(--font-halyard-display-variable);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --transition: 0.2s var(--ease);
 }
-
 html { scroll-behavior: smooth; }
 
 body {

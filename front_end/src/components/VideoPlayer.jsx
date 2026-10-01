@@ -17,7 +17,7 @@ import { useToast } from "./ui/Toast";
 // For a standard Vite project, we just import it:
 import Hls from "hls.js";
 
-const SPEAKER_COLORS = ["#34D399","#818CF8","#F59E0B","#F472B6","#60A5FA","#C084FC"];
+const SPEAKER_COLORS = ["#ffedd7","#6c5f51","#dc5000","#dc5000","#ffedd7","#6c5f51"];
 const speakerColor = (name) => {
   if (!name) return "var(--text-muted)";
   const idx = parseInt(name.replace(/\D/g,"")) - 1 || 0;
@@ -80,7 +80,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
   // ── تهيئة HLS (Feature 6) ──
   useEffect(() => {
     if (!video || !videoRef.current) return;
-    
+
     // إذا كان hls_ready جاهزًا والمشغل يدعم HLS
     if (video.hls_ready && Hls.isSupported()) {
       const hls = new Hls({ maxBufferLength: 30 });
@@ -88,9 +88,9 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       // نضيف التوكن إذا كان هناك رابط مشاركة محمي (لتبسيط الأمر مع hls، نفضل تمرير التوكن عبر headers أو query params)
       // لكن Vercel/Cloudflare يتعاملون معها. في حالتنا hlsUrl في client لا تدعم توكن المشاركة المحمية،
       // لذا HLS سيكون معطلاً للروابط المحمية إلا إذا أضفناه. للتبسيط، سنستخدم hls_ready للمشاهدة العادية.
-      
+
       const streamSrc = (tempToken) ? `${videosAPI.hlsUrl(video.id)}?access_token=${tempToken}` : videosAPI.hlsUrl(video.id);
-      
+
       hls.loadSource(streamSrc);
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -130,7 +130,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       setProgress(data.progress_percent || 0);
       setCurrentStage(data.current_stage || "");
       if (data.full_text) setEditText(data.full_text);
-      
+
       // Poll for incomplete statuses
       const pollingStatuses = ["pending", "queued", "normalizing", "vad", "transcribing", "aligning", "diarizing", "merging", "processing"];
       if (pollingStatuses.includes(data.status)) {
@@ -245,10 +245,10 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
     const color = speakerColor(speaker);
 
     return (
-      <div style={{ 
-        display: "flex", 
-        alignItems: "center", 
-        gap: 4, 
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
         marginBottom: 4,
         padding: "4px 8px",
         background: "var(--bg)",
@@ -275,12 +275,12 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
           <Edit size={10} />
         </button>
         {isAmbiguousSegment && (
-          <span 
-            style={{ 
-              fontSize: 9, 
-              padding: "1px 4px", 
-              background: "#F59E0B20", 
-              color: "#F59E0B", 
+          <span
+            style={{
+              fontSize: 9,
+              padding: "1px 4px",
+              background: "#dc500020",
+              color: "#dc5000",
               borderRadius: 3,
               display: "flex",
               alignItems: "center",
@@ -292,12 +292,12 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
           </span>
         )}
         {hasOverlap && (
-          <span 
-            style={{ 
-              fontSize: 9, 
-              padding: "1px 4px", 
-              background: "#F472B620", 
-              color: "#F472B6", 
+          <span
+            style={{
+              fontSize: 9,
+              padding: "1px 4px",
+              background: "#dc500020",
+              color: "#dc5000",
               borderRadius: 3,
               display: "flex",
               alignItems: "center",
@@ -329,7 +329,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
-    
+
     try {
       const c = await commentsAPI.add(video.id, {
         timestamp_seconds: currentTime,
@@ -360,8 +360,8 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
 
       {/* ── عمود الفيديو ──────────────────────────── */}
       <div>
-        <div style={{ borderRadius:14, overflow:"hidden", background:"#000", border:"1px solid var(--border)", marginBottom:16, position: "relative" }}>
-          
+        <div style={{ borderRadius:14, overflow:"hidden", background:"#100904", border:"1px solid var(--border)", marginBottom:16, position: "relative" }}>
+
           <video ref={videoRef} controls
             style={{ width:"100%", display:"block", maxHeight:440 }}
             onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
@@ -371,13 +371,13 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
           {/* Feature 2 & 3: Timeline Overlays (Chapters & Comments) */}
           {duration > 0 && (
             <div style={{ position: "absolute", bottom: 44, left: 16, right: 16, height: 10, pointerEvents: "none" }}>
-              
+
               {/* فصول */}
               {chapters.map((ch, i) => {
                 const left = (ch.start / duration) * 100;
                 return (
-                  <div key={`ch-${i}`} 
-                    style={{ position: "absolute", left: `${left}%`, top: 0, bottom: 0, width: 2, background: "#818CF8", zIndex: 10 }}
+                  <div key={`ch-${i}`}
+                    style={{ position: "absolute", left: `${left}%`, top: 0, bottom: 0, width: 2, background: "#6c5f51", zIndex: 10 }}
                     title={ch.title}
                   />
                 );
@@ -388,8 +388,8 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
                 const left = (c.timestamp_seconds / duration) * 100;
                 const isActive = activeCommentId === c.id;
                 return (
-                  <div key={c.id} 
-                    style={{ position: "absolute", left: `calc(${left}% - 5px)`, top: -2, width: 10, height: 10, borderRadius: "50%", background: isActive ? "#34D399" : "#fff", border: "2px solid #000", zIndex: 20, pointerEvents: "auto", cursor: "pointer", transition: "transform 0.2s", transform: isActive ? "scale(1.5)" : "scale(1)" }}
+                  <div key={c.id}
+                    style={{ position: "absolute", left: `calc(${left}% - 5px)`, top: -2, width: 10, height: 10, borderRadius: "50%", background: isActive ? "#ffedd7" : "#ffedd7", border: "2px solid #100904", zIndex: 20, pointerEvents: "auto", cursor: "pointer", transition: "transform 0.2s", transform: isActive ? "scale(1.5)" : "scale(1)" }}
                     onClick={() => { setActiveCommentId(c.id); seekTo(c.timestamp_seconds); }}
                   />
                 );
@@ -398,7 +398,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
           )}
 
           {video.hls_ready && isHlsLoaded && (
-            <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.6)", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, color: "#fff", pointerEvents: "none" }}>
+            <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.6)", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, color: "#ffedd7", pointerEvents: "none" }}>
               HLS
             </div>
           )}
@@ -436,9 +436,9 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
               <Sparkles size={15} color="var(--purple)" /> {t("player.smart_features")}
             </span>
             <div style={{ display:"flex", gap:6 }}>
-              <span style={{ fontSize:10, background:"#34D39920", color:"#34D399", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_translate")}</span>
-              <span style={{ fontSize:10, background:"#818CF820", color:"#818CF8", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_summarize")}</span>
-              <span style={{ fontSize:10, background:"#C084FC20", color:"#C084FC", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_speakers")}</span>
+              <span style={{ fontSize:10, background:"#ffedd720", color:"#ffedd7", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_translate")}</span>
+              <span style={{ fontSize:10, background:"#6c5f5120", color:"#6c5f51", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_summarize")}</span>
+              <span style={{ fontSize:10, background:"#6c5f5120", color:"#6c5f51", borderRadius:6, padding:"2px 8px" }}>{t("player.badge_speakers")}</span>
               <span style={{ color:"var(--text-muted)", display:"flex", alignItems:"center" }}>{showAI ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
             </div>
           </button>
@@ -479,7 +479,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
         {/* ── Feature 3: التعليقات ────────────────────────── */}
         <div className="card">
           <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>{t("player.comments")}</h3>
-          
+
           <form onSubmit={handleAddComment} style={{ display: "flex", gap: 10, marginBottom: 20 }}>
             {!user && (
               <input type="text" placeholder={t("player.guest_name_placeholder")} value={authorName} onChange={e => setAuthorName(e.target.value)} style={{ width: 120, fontSize: 12 }} />
@@ -490,9 +490,9 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {comments.length === 0 && <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>{t("player.no_comments")}</div>}
-            
+
             {comments.map(c => (
-              <div key={c.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: activeCommentId === c.id ? "#34D39910" : "transparent", padding: "8px", borderRadius: 8, transition: "background 0.2s" }}>
+              <div key={c.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: activeCommentId === c.id ? "#ffedd710" : "transparent", padding: "8px", borderRadius: 8, transition: "background 0.2s" }}>
                 <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
                   {c.author_name.charAt(0).toUpperCase()}
                 </div>
@@ -608,8 +608,8 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
                   )}
                   <div onClick={() => seekTo(seg.start)}
                     style={{ padding:"8px 12px", borderRadius:8, marginBottom:2, cursor:"pointer",
-                      background: isActive ? "#34D39920" : "transparent",
-                      border:`1px solid ${isActive ? "#34D39955" : "transparent"}`,
+                      background: isActive ? "#ffedd720" : "transparent",
+                      border:`1px solid ${isActive ? "#ffedd755" : "transparent"}`,
                       transition:"all 0.2s", lineHeight:1.7,
                       borderRight: seg.speaker ? `3px solid ${spColor}` : "3px solid transparent",
                     }}
@@ -622,8 +622,8 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
                       {seg.words && seg.words.length > 0 && (
                         <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "var(--text-muted)", lineHeight: 1.6 }}>
                           {seg.words.map((w, wi) => (
-                            <span key={wi} style={{ 
-                              background: isActive ? "#34D39930" : "transparent",
+                            <span key={wi} style={{
+                              background: isActive ? "#ffedd730" : "transparent",
                               padding: "1px 3px",
                               borderRadius: 3,
                               marginRight: 2,
@@ -647,11 +647,11 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
             <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:8 }}>{t("player.export")}</div>
             <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
               {[
-                { fmt:"txt",  label:".txt",  color:"#34D399" },
-                { fmt:"srt",  label:".srt",  color:"#818CF8" },
-                { fmt:"vtt",  label:".vtt",  color:"#F59E0B" },
-                { fmt:"docx", label:".docx", color:"#60A5FA" },
-                { fmt:"json", label:".json", color:"#F59E0B" },
+                { fmt:"txt",  label:".txt",  color:"#ffedd7" },
+                { fmt:"srt",  label:".srt",  color:"#6c5f51" },
+                { fmt:"vtt",  label:".vtt",  color:"#dc5000" },
+                { fmt:"docx", label:".docx", color:"#ffedd7" },
+                { fmt:"json", label:".json", color:"#dc5000" },
               ].map(({ fmt, label, color }) => (
                 <a key={fmt} href={aiAPI.exportUrl(video.id, fmt)} download
                   style={{ flex:1, minWidth:50, textAlign:"center", padding:"6px 4px", borderRadius:8,

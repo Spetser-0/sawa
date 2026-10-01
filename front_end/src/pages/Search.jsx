@@ -125,7 +125,7 @@ export default function Search() {
               outline: "none", boxSizing: "border-box",
               transition: "border-color 0.2s",
             }}
-            onFocus={(e) => e.target.style.borderColor = "#34D399"}
+            onFocus={(e) => e.target.style.borderColor = "#ffedd7"}
             onBlur={(e) => e.target.style.borderColor = "var(--border)"}
           />
           <button type="submit" aria-label={t("search.title")}
@@ -136,7 +136,7 @@ export default function Search() {
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
             {loading
-              ? <span className="spin" style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
+              ? <span className="spin" style={{ width: 16, height: 16, border: "2px solid #100904", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
               : <SearchIcon size={17} color="#04120c" strokeWidth={2.5} />
             }
           </button>
@@ -167,7 +167,7 @@ export default function Search() {
 
       {/* خطأ */}
       {error && (
-        <div style={{ padding: "12px 16px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, color: "var(--red)", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "12px 16px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 10, color: "var(--red)", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
           <AlertCircle size={15} style={{ flexShrink: 0 }} />
           {error}
         </div>
@@ -189,12 +189,12 @@ export default function Search() {
           ) : (
             <div style={{
               display: "flex", gap: 12, flexWrap: "wrap",
-              padding: "12px 16px", background: "#34D39910",
-              border: "1px solid #34D39933", borderRadius: 12,
+              padding: "12px 16px", background: "#ffedd710",
+              border: "1px solid #ffedd733", borderRadius: 12,
             }}>
               {[
-                { label: t("search.total_results"), value: results.total_matches, color: "#34D399" },
-                { label: t("search.recordings_found"), value: results.videos_found, color: "#818CF8" },
+                { label: t("search.total_results"), value: results.total_matches, color: "#ffedd7" },
+                { label: t("search.recordings_found"), value: results.videos_found, color: "#6c5f51" },
               ].map(s => (
                 <div key={s.label} style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</span>
@@ -212,7 +212,7 @@ export default function Search() {
       {/* ── النتائج ─────────────────────────────────── */}
       {results?.results.map((result) => (
         <div key={result.video_id} className="card fade-in"
-          style={{ marginBottom: 12, border: expanded[result.video_id] ? "1px solid #34D39933" : "1px solid var(--border)" }}>
+          style={{ marginBottom: 12, border: expanded[result.video_id] ? "1px solid #ffedd733" : "1px solid var(--border)" }}>
 
           {/* رأس الفيديو */}
           <div
@@ -236,7 +236,7 @@ export default function Search() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ background: "#34D39920", color: "#34D399", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700 }}>
+              <span style={{ background: "#ffedd720", color: "#ffedd7", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700 }}>
                 {result.match_count} {t("search.result_count")}
               </span>
               <span style={{ color: "var(--text-muted)", display: "flex" }}>
@@ -257,12 +257,12 @@ export default function Search() {
                     cursor: "pointer", background: "var(--bg)",
                     border: "1px solid var(--border)", transition: "all 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#34D39966"; e.currentTarget.style.background = "#34D39908"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ffedd766"; e.currentTarget.style.background = "#ffedd708"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg)"; }}
                 >
                   {/* التوقيت */}
                   <div style={{
-                    flexShrink: 0, background: "#34D39920", color: "#34D399",
+                    flexShrink: 0, background: "#ffedd720", color: "#ffedd7",
                     borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 800,
                     fontFamily: "monospace", lineHeight: 1.6,
                   }}>
@@ -272,7 +272,7 @@ export default function Search() {
                   {/* النص */}
                   <div style={{ flex: 1 }}>
                     {match.speaker && (
-                      <div style={{ fontSize: 10, color: "#818CF8", marginBottom: 3, fontWeight: 700 }}>
+                      <div style={{ fontSize: 10, color: "#6c5f51", marginBottom: 3, fontWeight: 700 }}>
                         {match.speaker}
                       </div>
                     )}

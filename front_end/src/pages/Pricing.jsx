@@ -19,17 +19,17 @@ export default function Pricing() {
 
   const PLANS = [
     {
-      id:"free", name:t("pricing.free_name"), price:0, color:"#555",
+      id:"free", name:t("pricing.free_name"), price:0, color:"#5b4b3c",
       features:[t("pricing.free_features.0"), t("pricing.free_features.1"), t("pricing.free_features.2"), t("pricing.free_features.3")],
       cta:t("pricing.free_cta"), disabled:true,
     },
     {
-      id:"pro", name:t("pricing.pro_name"), price:7, color:"#34D399",
+      id:"pro", name:t("pricing.pro_name"), price:7, color:"#ffedd7",
       features:[t("pricing.pro_features.0"), t("pricing.pro_features.1"), t("pricing.pro_features.2"), t("pricing.pro_features.3"), t("pricing.pro_features.4")],
       cta:t("pricing.pro_cta"), disabled:false, popular:true,
     },
     {
-      id:"team", name:t("pricing.team_name"), price:20, color:"#818CF8",
+      id:"team", name:t("pricing.team_name"), price:20, color:"#6c5f51",
       features:[t("pricing.team_features.0"), t("pricing.team_features.1"), t("pricing.team_features.2"), t("pricing.team_features.3"), t("pricing.team_features.4")],
       cta:t("pricing.team_cta"), disabled:false,
     },
@@ -82,7 +82,7 @@ export default function Pricing() {
             borderRadius:16, padding:24, position:"relative",
           }}>
             {p.popular && (
-              <div style={{ position:"absolute", top:-12, right:20, background:p.color, color:"#000", borderRadius:20, padding:"3px 14px", fontSize:11, fontWeight:800 }}>
+              <div style={{ position:"absolute", top:-12, right:20, background:p.color, color:"#100904", borderRadius:20, padding:"3px 14px", fontSize:11, fontWeight:800 }}>
                 {t("pricing.popular_badge")}
               </div>
             )}
@@ -102,9 +102,9 @@ export default function Pricing() {
               onClick={() => handleSubscribe(p.id)}
               style={{
                 width:"100%", marginTop:20, padding:"11px",
-                background: user?.plan === p.id ? "#34D39930" : p.disabled ? "#1a1a2e" : p.color,
-                color: user?.plan === p.id ? "#34D399" : p.disabled ? "#555" : "#000",
-                border:`1px solid ${user?.plan === p.id ? "#34D39966" : "transparent"}`,
+                background: user?.plan === p.id ? "#ffedd730" : p.disabled ? "#1a1a2e" : p.color,
+                color: user?.plan === p.id ? "#ffedd7" : p.disabled ? "#5b4b3c" : "#100904",
+                border:`1px solid ${user?.plan === p.id ? "#ffedd766" : "transparent"}`,
                 borderRadius:10, fontWeight:700, cursor:p.disabled?"default":"pointer",
                 fontFamily:"inherit", fontSize:14, transition:"all 0.2s",
               }}
@@ -117,7 +117,7 @@ export default function Pricing() {
       </div>
 
       {error && (
-        <div style={{ padding:"12px 16px", background:"#F8717115", border:"1px solid #F8717133", borderRadius:10, color:"var(--red)", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+        <div style={{ padding:"12px 16px", background:"#dc500015", border:"1px solid #dc500033", borderRadius:10, color:"var(--red)", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
           <AlertCircle size={15} style={{ flexShrink:0 }} />
           {error}
         </div>
@@ -133,12 +133,12 @@ export default function Pricing() {
             { step:"3", text:t("pricing.payment_step3") },
           ].map(s => (
             <div key={s.step} style={{ textAlign:"center" }}>
-              <div style={{ width:32, height:32, borderRadius:"50%", background:"#34D39920", border:"1px solid #34D39944", margin:"0 auto 8px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#34D399" }}>{s.step}</div>
+              <div style={{ width:32, height:32, borderRadius:"50%", background:"#ffedd720", border:"1px solid #ffedd744", margin:"0 auto 8px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800, color:"#ffedd7" }}>{s.step}</div>
               <div style={{ fontSize:12, color:"var(--text-muted)", lineHeight:1.5 }}>{s.text}</div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop:14, padding:"10px 14px", background:"#FCD34D10", border:"1px solid #FCD34D22", borderRadius:8, fontSize:12, color:"#FCD34D" }}>
+        <div style={{ marginTop:14, padding:"10px 14px", background:"#ffedd710", border:"1px solid #ffedd722", borderRadius:8, fontSize:12, color:"#ffedd7" }}>
           {t("pricing.payment_fee_note")}
         </div>
       </div>

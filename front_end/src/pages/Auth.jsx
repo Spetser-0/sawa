@@ -18,7 +18,7 @@ function getStrength(pwd) {
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
   return score;
 }
-const STRENGTH_COLORS = ["#F87171", "#F87171", "#FCD34D", "#34D399", "#34D399"];
+const STRENGTH_COLORS = ["#dc5000", "#dc5000", "#ffedd7", "#ffedd7", "#ffedd7"];
 
 export default function Auth() {
   const { t } = useTranslation();
@@ -187,7 +187,7 @@ export default function Auth() {
       <div style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
         <div style={{ width: "100%", maxWidth: 420 }}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <Link to="/" style={{ textDecoration: "none", fontSize: 28, fontWeight: 900, background: "linear-gradient(135deg, #34D399, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>سوى</Link>
+            <Link to="/" style={{ textDecoration: "none", fontSize: 28, fontWeight: 900, background: "linear-gradient(135deg, #ffedd7, #6c5f51)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>سوى</Link>
           </div>
 
           <div className="card fade-in">
@@ -200,7 +200,7 @@ export default function Auth() {
                     <label>{t("auth.email")}</label>
                     <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="example@email.com" />
                   </div>
-                  {forgotMessage && <div style={{ padding: "10px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>{forgotMessage}</div>}
+                  {forgotMessage && <div style={{ padding: "10px 14px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>{forgotMessage}</div>}
                   <button className="btn btn-primary" onClick={handleForgotEmail} disabled={loading} style={{ justifyContent: "center" }}>
                     {loading ? t("auth.sending") : t("auth.send_otp")}
                   </button>
@@ -224,7 +224,7 @@ export default function Auth() {
                     />
                   ))}
                 </div>
-                {forgotMessage && <div style={{ padding: "10px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 8, fontSize: 13, color: "var(--red)", marginBottom: 12, textAlign: "center" }}>{forgotMessage}</div>}
+                {forgotMessage && <div style={{ padding: "10px 14px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 8, fontSize: 13, color: "var(--red)", marginBottom: 12, textAlign: "center" }}>{forgotMessage}</div>}
                 <div style={{ textAlign: "center" }}>
                   {otpCountdown > 0 ? (
                     <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("auth.resend_after")} {otpCountdown} {t("auth.resend_seconds")}</span>
@@ -256,7 +256,7 @@ export default function Auth() {
                     );
                   })()}
                   <PasswordInput label={t("auth.confirm_password")} value={confirmNew} onChange={e => setConfirmNew(e.target.value)} placeholder={t("auth.confirm_password_placeholder")} name="confirm_new_password" />
-                  {forgotMessage && <div style={{ padding: "10px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>{forgotMessage}</div>}
+                  {forgotMessage && <div style={{ padding: "10px 14px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>{forgotMessage}</div>}
                   <button className="btn btn-primary" onClick={handleResetPassword} disabled={loading} style={{ justifyContent: "center" }}>
                     {loading ? t("auth.changing") : t("auth.change_password_btn")}
                   </button>
@@ -275,7 +275,7 @@ export default function Auth() {
       <div style={{ width: "100%", maxWidth: 420 }}>
 
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <Link to="/" style={{ textDecoration: "none", fontSize: 28, fontWeight: 900, background: "linear-gradient(135deg, #34D399, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          <Link to="/" style={{ textDecoration: "none", fontSize: 28, fontWeight: 900, background: "linear-gradient(135deg, #ffedd7, #6c5f51)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             سوى
           </Link>
           <p style={{ color: "var(--text-muted)", fontSize: 14, marginTop: 8 }}>
@@ -308,7 +308,7 @@ export default function Auth() {
             const bytes   = passwordByteLen(password);
             const tooLong = bytes > PASSWORD_MAX_BYTES;
             const nearMax = bytes >= PASSWORD_MAX_BYTES - 8;
-            const color   = tooLong ? "var(--red)" : nearMax ? "#F59E0B" : "var(--text-muted)";
+            const color   = tooLong ? "var(--red)" : nearMax ? "#dc5000" : "var(--text-muted)";
             return (
               <div style={{ display: "flex", justifyContent: "flex-end", fontSize: 11, color, marginTop: -8, marginBottom: 2 }}>
                 {bytes}/{PASSWORD_MAX_BYTES} bytes
@@ -347,7 +347,7 @@ export default function Auth() {
             )}
 
             {error && (
-              <div style={{ padding: "10px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>
+              <div style={{ padding: "10px 14px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>
                 {error}
               </div>
             )}
@@ -356,7 +356,7 @@ export default function Auth() {
               style={{ justifyContent: "center", marginTop: 4, opacity: loading ? 0.7 : 1 }}>
               {loading ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="spin" style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
+                  <span className="spin" style={{ width: 16, height: 16, border: "2px solid #100904", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
                   {t("auth.loading")}
                 </span>
               ) : mode === "login" ? t("auth.login_btn") : t("auth.register_btn")}

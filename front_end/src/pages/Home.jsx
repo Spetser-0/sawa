@@ -117,7 +117,7 @@ function MeshBackground() {
 /* ─────────────────────────────────────────────────────
    Component: موجة صوت متحركة
 ───────────────────────────────────────────────────── */
-function AudioWave({ color = "#34D399", height = 60, bars = 40 }) {
+function AudioWave({ color = "#ffedd7", height = 60, bars = 40 }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -196,27 +196,27 @@ function ProductMockup() {
     <div ref={ref} style={{
       transition: "transform 0.12s ease",
       transformStyle: "preserve-3d",
-      background: "linear-gradient(135deg, #0d0d1a, #13132a)",
-      border: "1px solid #34D39930",
+      background: "linear-gradient(135deg, #382416, #49301f)",
+      border: "1px solid #ffedd730",
       borderRadius: 20,
       padding: 20,
-      boxShadow: "0 40px 80px #00000060, 0 0 0 1px #34D39920, inset 0 1px 0 #ffffff08",
+      boxShadow:"none",
       maxWidth: 460,
       width: "100%",
     }}>
       {/* شريط العنوان */}
       <div style={{ display:"flex", gap:6, marginBottom:14 }}>
-        {["#F87171","#FCD34D","#34D399"].map(c => (
+        {["#dc5000","#ffedd7","#ffedd7"].map(c => (
           <div key={c} style={{ width:10, height:10, borderRadius:"50%", background:c, opacity:0.8 }} />
         ))}
-        <div style={{ flex:1, background:"#ffffff0a", borderRadius:6, height:10, margin:"0 8px" }} />
+        <div style={{ flex:1, background:"#ffedd70a", borderRadius:6, height:10, margin:"0 8px" }} />
       </div>
 
       {/* مشغّل مصغّر */}
-      <div style={{ background:"#000", borderRadius:12, height:140, marginBottom:14, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", position:"relative" }}>
-        <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg, #34D39915, #818CF815)" }} />
-        <AudioWave color="#34D399" height={80} bars={30} />
-        <div style={{ position:"absolute", bottom:8, left:12, fontSize:12, color:"#34D399", fontFamily:"monospace", background:"#00000080", borderRadius:6, padding:"2px 8px" }}>
+      <div style={{ background:"#100904", borderRadius:12, height:140, marginBottom:14, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", position:"relative" }}>
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg, #ffedd715, #6c5f5115)" }} />
+        <AudioWave color="#ffedd7" height={80} bars={30} />
+        <div style={{ position:"absolute", bottom:8, left:12, fontSize:12, color:"#ffedd7", fontFamily:"monospace", background:"#10090480", borderRadius:6, padding:"2px 8px" }}>
           ● 00:06
         </div>
       </div>
@@ -226,9 +226,9 @@ function ProductMockup() {
         {words.map((w, i) => (
           <div key={i} style={{
             padding: "5px 10px", borderRadius: 8, fontSize: 14, fontWeight: 600,
-            background: i === activeWord ? "#34D399" : "#ffffff0a",
-            color:      i === activeWord ? "#000" : "#ccc",
-            border:     `1px solid ${i === activeWord ? "#34D399" : "#ffffff10"}`,
+            background: i === activeWord ? "#ffedd7" : "#ffedd70a",
+            color:      i === activeWord ? "#100904" : "#ffedd7",
+            border:     `1px solid ${i === activeWord ? "#ffedd7" : "#ffedd710"}`,
             transition: "all 0.3s",
             cursor:     "pointer",
           }}>
@@ -244,7 +244,7 @@ function ProductMockup() {
           { icon: <Sparkles size={12} />, label: "تلخيص" },
           { icon: <File size={12} />, label: ".docx" },
         ].map((btn) => (
-          <div key={btn.label} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:5, padding:"6px", background:"#ffffff08", border:"1px solid #ffffff10", borderRadius:8, fontSize:11, color:"#888" }}>
+          <div key={btn.label} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:5, padding:"6px", background:"#ffedd708", border:"1px solid #ffedd710", borderRadius:8, fontSize:11, color:"#6c5f51" }}>
             {btn.icon}
             {btn.label}
           </div>
@@ -270,8 +270,8 @@ function FeatureCard({ icon, title, desc, color, delay = 0 }) {
     }}>
       <div ref={cardRef} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
         style={{
-          background: hovered ? `${color}08` : "#0d0d1a",
-          border: `1px solid ${hovered ? color + "44" : "#1e1e30"}`,
+          background: hovered ? `${color}08` : "#382416",
+          border: `1px solid ${hovered ? color + "44" : "#40372e"}`,
           borderRadius: 16, padding: "24px 20px",
           transition: "all 0.3s ease",
           cursor: "default",
@@ -297,8 +297,8 @@ function FeatureCard({ icon, title, desc, color, delay = 0 }) {
         }}>
           {icon}
         </div>
-        <div style={{ fontWeight:800, fontSize:15, marginBottom:8, color:"#fff" }}>{title}</div>
-        <div style={{ fontSize:13, color:"#888", lineHeight:1.7 }}>{desc}</div>
+        <div style={{ fontWeight:800, fontSize:15, marginBottom:8, color:"#ffedd7" }}>{title}</div>
+        <div style={{ fontSize:13, color:"#6c5f51", lineHeight:1.7 }}>{desc}</div>
       </div>
     </div>
   );
@@ -319,7 +319,7 @@ function Stat({ value, suffix, label, color, delay }) {
       <div style={{ fontSize:42, fontWeight:900, color, lineHeight:1, marginBottom:6 }}>
         {count}{suffix}
       </div>
-      <div style={{ fontSize:13, color:"#666" }}>{label}</div>
+      <div style={{ fontSize:13, color:"#6c5f51" }}>{label}</div>
     </div>
   );
 }
@@ -334,16 +334,16 @@ function CompareRow({ feature, sawa, loom, delay }) {
       opacity: vis ? 1 : 0, transition: `opacity 0.5s ease ${delay}ms`,
       borderBottom: "1px solid #10101e",
     }}>
-      <td style={{ padding:"12px 16px", fontSize:13, color:"#ccc" }}>{feature}</td>
+      <td style={{ padding:"12px 16px", fontSize:13, color:"#ffedd7" }}>{feature}</td>
       <td style={{ textAlign:"center", padding:"12px" }}>
         {sawa
-          ? <Check size={18} color="#34D399" style={{ filter:"drop-shadow(0 0 6px #34D399)" }} strokeWidth={3} />
-          : <X size={18} color="#F87171" strokeWidth={3} />}
+          ? <Check size={18} color="#ffedd7" style={{ filter:"drop-shadow(0 0 6px #ffedd7)" }} strokeWidth={3} />
+          : <X size={18} color="#dc5000" strokeWidth={3} />}
       </td>
       <td style={{ textAlign:"center", padding:"12px" }}>
         {loom
-          ? <Check size={18} color="#666" strokeWidth={3} />
-          : <X size={18} color="#444" strokeWidth={3} />}
+          ? <Check size={18} color="#6c5f51" strokeWidth={3} />
+          : <X size={18} color="#5b4b3c" strokeWidth={3} />}
       </td>
     </tr>
   );
@@ -367,8 +367,8 @@ function PricingCard({ plan, index, startFreeLabel, subscribeLabel, popularLabel
           onMouseEnter={() => setHov(true)}
           onMouseLeave={() => setHov(false)}
           style={{
-            background: p.popular ? `linear-gradient(135deg, ${p.color}12, #0d0d1a)` : "#0d0d1a",
-            border: `${p.popular ? 2 : 1}px solid ${hov || p.popular ? p.color + "55" : "#1e1e30"}`,
+            background: p.popular ? `linear-gradient(135deg, ${p.color}12, #382416)` : "#382416",
+            border: `${p.popular ? 2 : 1}px solid ${hov || p.popular ? p.color + "55" : "#40372e"}`,
             borderRadius:16, padding:24, position:"relative",
             transition:"all 0.3s", height:"100%", boxSizing:"border-box",
             boxShadow: p.popular ? `0 0 40px ${p.color}15` : "none",
@@ -377,20 +377,20 @@ function PricingCard({ plan, index, startFreeLabel, subscribeLabel, popularLabel
           {p.popular && (
             <div style={{
               position:"absolute", top:-12, right:20,
-              background:`linear-gradient(90deg, #34D399, #818CF8)`,
-              color:"#000", borderRadius:20, padding:"3px 14px",
+              background:`linear-gradient(90deg, #ffedd7, #6c5f51)`,
+              color:"#100904", borderRadius:20, padding:"3px 14px",
               fontSize:11, fontWeight:900,
             }}>{popularLabel}</div>
           )}
           <div style={{ color:p.color, fontWeight:800, fontSize:15, marginBottom:10 }}>{p.name}</div>
           <div style={{ marginBottom:20 }}>
-            <span style={{ fontSize:36, fontWeight:900, color:"#fff" }}>${p.price}</span>
-            <span style={{ fontSize:13, color:"#666" }}>{p.period}</span>
+            <span style={{ fontSize:36, fontWeight:900, color:"#ffedd7" }}>${p.price}</span>
+            <span style={{ fontSize:13, color:"#6c5f51" }}>{p.period}</span>
           </div>
           {p.features.map(f => (
             <div key={f} style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
               <Check size={13} color={p.color} strokeWidth={3} style={{ flexShrink:0 }} />
-              <span style={{ fontSize:13, color:"#bbb" }}>{f}</span>
+              <span style={{ fontSize:13, color:"#d8c5ae" }}>{f}</span>
             </div>
           ))}
           <Link to={p.price > 0 ? "/pricing" : "/auth"}
@@ -398,7 +398,7 @@ function PricingCard({ plan, index, startFreeLabel, subscribeLabel, popularLabel
               display:"block", width:"100%", textAlign:"center",
               padding:"11px", marginTop:20, borderRadius:10,
               background: p.popular ? p.color : "transparent",
-              color: p.popular ? "#000" : p.color,
+              color: p.popular ? "#100904" : p.color,
               border:`1px solid ${p.color}66`,
               fontWeight:800, fontSize:14, textDecoration:"none",
               transition:"all 0.2s", boxSizing:"border-box",
@@ -421,12 +421,12 @@ export default function Home() {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
 
   const FEATURES = [
-    { icon:<Mic size={22} color="#34D399" />, title: t("home.feature_recording"), desc: t("home.feature_recording_desc"), color:"#34D399" },
-    { icon:<BrainCircuit size={22} color="#818CF8" />, title: t("home.feature_transcription"), desc: t("home.feature_transcription_desc"), color:"#818CF8" },
-    { icon:<Search size={22} color="#F59E0B" />, title: t("home.feature_search"), desc: t("home.feature_search_desc"), color:"#F59E0B" },
-    { icon:<Globe size={22} color="#F472B6" />, title: t("home.feature_ai"), desc: t("home.feature_ai_desc"), color:"#F472B6" },
-    { icon:<FileText size={22} color="#60A5FA" />, title: t("home.feature_export"), desc: t("home.feature_export_desc"), color:"#60A5FA" },
-    { icon:<Lock size={22} color="#C084FC" />, title: t("home.feature_privacy"), desc: t("home.feature_privacy_desc"), color:"#C084FC" },
+    { icon:<Mic size={22} color="#ffedd7" />, title: t("home.feature_recording"), desc: t("home.feature_recording_desc"), color:"#ffedd7" },
+    { icon:<BrainCircuit size={22} color="#6c5f51" />, title: t("home.feature_transcription"), desc: t("home.feature_transcription_desc"), color:"#6c5f51" },
+    { icon:<Search size={22} color="#dc5000" />, title: t("home.feature_search"), desc: t("home.feature_search_desc"), color:"#dc5000" },
+    { icon:<Globe size={22} color="#dc5000" />, title: t("home.feature_ai"), desc: t("home.feature_ai_desc"), color:"#dc5000" },
+    { icon:<FileText size={22} color="#ffedd7" />, title: t("home.feature_export"), desc: t("home.feature_export_desc"), color:"#ffedd7" },
+    { icon:<Lock size={22} color="#6c5f51" />, title: t("home.feature_privacy"), desc: t("home.feature_privacy_desc"), color:"#6c5f51" },
   ];
   const heroRef = useRef(null);
   const [heroRef2, heroVis] = useReveal();
@@ -438,7 +438,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div style={{ position:"relative", overflow:"hidden" }}>
+    <div className="home-page" style={{ position:"relative", overflow:"hidden" }}>
       <MeshBackground />
 
       {/* ════════════════════════════════
@@ -451,7 +451,7 @@ export default function Home() {
         <div style={{
           position:"absolute", pointerEvents:"none",
           width:600, height:600, borderRadius:"50%",
-          background: "radial-gradient(circle, #34D39910 0%, transparent 70%)",
+          background: "radial-gradient(circle, #ffedd710 0%, transparent 70%)",
           left: `calc(${mousePos.x * 100}% - 300px)`,
           top:  `calc(${mousePos.y * 100}% - 300px)`,
           transition:"left 0.1s, top 0.1s",
@@ -463,10 +463,10 @@ export default function Home() {
           <div>
             <div style={{
               display:"inline-flex", gap:8, alignItems:"center",
-              background:"#34D39915", border:"1px solid #34D39930",
-              borderRadius:20, padding:"6px 14px", marginBottom:24, fontSize:12, color:"#34D399",
+              background:"#ffedd715", border:"1px solid #ffedd730",
+              borderRadius:20, padding:"6px 14px", marginBottom:24, fontSize:12, color:"#ffedd7",
             }}>
-              <span style={{ width:7, height:7, borderRadius:"50%", background:"#34D399", animation:"pulse-ring 1.5s infinite" }} />
+              <span style={{ width:7, height:7, borderRadius:"50%", background:"#ffedd7", animation:"pulse-ring 1.5s infinite" }} />
               {t("home.badge")}
             </div>
 
@@ -474,56 +474,56 @@ export default function Home() {
               fontSize:"clamp(36px, 5vw, 58px)", fontWeight:900, lineHeight:1.15,
               marginBottom:20, letterSpacing:"-0.5px",
             }}>
-              <span style={{ color:"#fff" }}>{t("home.hero_title_1")}</span>
+              <span style={{ color:"#ffedd7" }}>{t("home.hero_title_1")}</span>
               <br />
               <span style={{
-                background:"linear-gradient(90deg, #34D399, #818CF8)",
+                background:"linear-gradient(90deg, #ffedd7, #6c5f51)",
                 WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
               }}>
                 {t("home.hero_title_2")}
               </span>
               <br />
-              <span style={{ color:"#fff" }}>{t("home.hero_title_3")}</span>
+              <span style={{ color:"#ffedd7" }}>{t("home.hero_title_3")}</span>
             </h1>
 
-            <p style={{ fontSize:16, color:"#888", lineHeight:1.8, marginBottom:32, maxWidth:440 }}>
+            <p style={{ fontSize:16, color:"#6c5f51", lineHeight:1.8, marginBottom:32, maxWidth:440 }}>
               {t("home.hero_desc")}
             </p>
 
             {/* موجة صوت */}
             <div style={{ marginBottom:28, opacity:0.7 }}>
-              <AudioWave color="#34D399" height={40} bars={50} />
+              <AudioWave color="#ffedd7" height={40} bars={50} />
             </div>
 
             <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
               <Link to="/record" style={{
                 display:"inline-flex", alignItems:"center", gap:8,
-                background:"#34D399", color:"#000", padding:"13px 28px",
+                background:"#ffedd7", color:"#100904", padding:"13px 28px",
                 borderRadius:12, fontWeight:800, fontSize:15, textDecoration:"none",
-                boxShadow:"0 0 30px #34D39940",
+                boxShadow:"none",
                 transition:"all 0.2s",
               }}
-                onMouseEnter={(e)=>e.currentTarget.style.boxShadow="0 0 50px #34D39960"}
-                onMouseLeave={(e)=>e.currentTarget.style.boxShadow="0 0 30px #34D39940"}
+                onMouseEnter={(e)=>e.currentTarget.style.boxShadow="none"}
+                onMouseLeave={(e)=>e.currentTarget.style.boxShadow="none"}
               >
                 <Video size={18} />
                 {t("home.cta_start")}
               </Link>
               <Link to="/auth" style={{
                 display:"inline-flex", alignItems:"center", gap:8,
-                background:"transparent", color:"#fff", padding:"13px 28px",
+                background:"transparent", color:"#ffedd7", padding:"13px 28px",
                 borderRadius:12, fontWeight:700, fontSize:15, textDecoration:"none",
-                border:"1px solid #ffffff20", backdropFilter:"blur(10px)",
+                border:"1px solid #ffedd720", backdropFilter:"blur(10px)",
                 transition:"all 0.2s",
               }}
-                onMouseEnter={(e)=>e.currentTarget.style.borderColor="#34D39966"}
-                onMouseLeave={(e)=>e.currentTarget.style.borderColor="#ffffff20"}
+                onMouseEnter={(e)=>e.currentTarget.style.borderColor="#ffedd766"}
+                onMouseLeave={(e)=>e.currentTarget.style.borderColor="#ffedd720"}
               >
                 {t("home.cta_register")}
               </Link>
             </div>
 
-            <p style={{ fontSize:12, color:"#555", marginTop:14 }}>
+            <p style={{ fontSize:12, color:"#5b4b3c", marginTop:14 }}>
               {t("home.hero_footer")}
             </p>
           </div>
@@ -542,15 +542,15 @@ export default function Home() {
         <div style={{ maxWidth:800, margin:"0 auto" }}>
           <div style={{
             display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0,
-            background:"#0d0d1a", border:"1px solid #1e1e30", borderRadius:16,
+            background:"#382416", border:"1px solid #40372e", borderRadius:16,
             overflow:"hidden",
           }}>
             {[
-              { value:400, suffix:"M+", label:t("home.stat_users_label"), color:"#34D399", delay:0 },
-              { value:99,  suffix:"%",  label:t("home.stat_accuracy_label"), color:"#818CF8", delay:150 },
-              { value:7,   suffix:"$",  label:t("home.stat_price_label"),   color:"#F59E0B", delay:300 },
+              { value:400, suffix:"M+", label:t("home.stat_users_label"), color:"#ffedd7", delay:0 },
+              { value:99,  suffix:"%",  label:t("home.stat_accuracy_label"), color:"#6c5f51", delay:150 },
+              { value:7,   suffix:"$",  label:t("home.stat_price_label"),   color:"#dc5000", delay:300 },
             ].map((s, i) => (
-              <div key={i} style={{ padding:"28px 20px", borderRight: i < 2 ? "1px solid #1e1e30" : "none" }}>
+              <div key={i} style={{ padding:"28px 20px", borderRight: i < 2 ? "1px solid #40372e" : "none" }}>
                 <Stat {...s} />
               </div>
             ))}
@@ -564,13 +564,13 @@ export default function Home() {
       <section style={{ padding:"60px 24px", position:"relative", zIndex:1 }}>
         <div style={{ maxWidth:1100, margin:"0 auto" }}>
           <div style={{ textAlign:"center", marginBottom:48 }}>
-            <div style={{ fontSize:12, color:"#818CF8", letterSpacing:3, marginBottom:12, textTransform:"uppercase" }}>
+            <div style={{ fontSize:12, color:"#6c5f51", letterSpacing:3, marginBottom:12, textTransform:"uppercase" }}>
               {t("home.stats_title")}
             </div>
             <h2 style={{ fontSize:"clamp(26px, 4vw, 38px)", fontWeight:900, marginBottom:12 }}>
               {t("home.stats_subtitle")}
             </h2>
-            <p style={{ color:"#666", fontSize:15, maxWidth:500, margin:"0 auto" }}>
+            <p style={{ color:"#6c5f51", fontSize:15, maxWidth:500, margin:"0 auto" }}>
               {t("home.stats_desc")}
             </p>
           </div>
@@ -587,7 +587,7 @@ export default function Home() {
       <section style={{ padding:"60px 24px", position:"relative", zIndex:1 }}>
         <div style={{ maxWidth:600, margin:"0 auto" }}>
           <div style={{ textAlign:"center", marginBottom:36 }}>
-            <div style={{ fontSize:12, color:"#F87171", letterSpacing:3, marginBottom:12, textTransform:"uppercase" }}>
+            <div style={{ fontSize:12, color:"#dc5000", letterSpacing:3, marginBottom:12, textTransform:"uppercase" }}>
               {t("home.compare_title")}
             </div>
             <h2 style={{ fontSize:"clamp(24px, 3vw, 34px)", fontWeight:900 }}>
@@ -596,15 +596,15 @@ export default function Home() {
           </div>
 
           <Card3D>
-            <div style={{ background:"#0d0d1a", border:"1px solid #1e1e30", borderRadius:16, overflow:"hidden" }}>
+            <div style={{ background:"#382416", border:"1px solid #40372e", borderRadius:16, overflow:"hidden" }}>
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
                 <thead>
-                  <tr style={{ borderBottom:"1px solid #1e1e30" }}>
-                    <th style={{ textAlign:"right", padding:"14px 16px", fontSize:12, color:"#555" }}>{t("home.compare_header_feature")}</th>
-                    <th style={{ textAlign:"center", padding:"14px", fontSize:15, color:"#34D399", fontWeight:900 }}>
+                  <tr style={{ borderBottom:"1px solid #40372e" }}>
+                    <th style={{ textAlign:"right", padding:"14px 16px", fontSize:12, color:"#5b4b3c" }}>{t("home.compare_header_feature")}</th>
+                    <th style={{ textAlign:"center", padding:"14px", fontSize:15, color:"#ffedd7", fontWeight:900 }}>
                       {t("home.compare_header_sawa")}
                     </th>
-                    <th style={{ textAlign:"center", padding:"14px", fontSize:13, color:"#555" }}>{t("home.compare_header_loom")}</th>
+                    <th style={{ textAlign:"center", padding:"14px", fontSize:13, color:"#5b4b3c" }}>{t("home.compare_header_loom")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -629,14 +629,14 @@ export default function Home() {
             <h2 style={{ fontSize:"clamp(24px,3vw,34px)", fontWeight:900, marginBottom:8 }}>
               {t("home.pricing_title")}
             </h2>
-            <p style={{ color:"#666" }}>{t("home.pricing_subtitle")}</p>
+            <p style={{ color:"#6c5f51" }}>{t("home.pricing_subtitle")}</p>
           </div>
 
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:14 }}>
             {[
-              { name:t("pricing.free_name"),  price:0,  color:"#555",    period:"",       features:[t("home.feature_recording"), t("home.feature_search"), t("home.feature_privacy")], popular:false },
-              { name:t("pricing.pro_name"),    price:7,  color:"#34D399", period:"/شهر",   features:[t("home.feature_ai"), t("home.feature_export"), t("home.feature_transcription"), t("home.feature_privacy")], popular:true },
-              { name:t("pricing.team_name"),   price:20, color:"#818CF8", period:"/شهر",   features:[t("home.feature_recording"), t("home.feature_search"), t("home.feature_ai"), t("home.feature_export")], popular:false },
+              { name:t("pricing.free_name"),  price:0,  color:"#5b4b3c",    period:"",       features:[t("home.feature_recording"), t("home.feature_search"), t("home.feature_privacy")], popular:false },
+              { name:t("pricing.pro_name"),    price:7,  color:"#ffedd7", period:"/شهر",   features:[t("home.feature_ai"), t("home.feature_export"), t("home.feature_transcription"), t("home.feature_privacy")], popular:true },
+              { name:t("pricing.team_name"),   price:20, color:"#6c5f51", period:"/شهر",   features:[t("home.feature_recording"), t("home.feature_search"), t("home.feature_ai"), t("home.feature_export")], popular:false },
             ].map((p, i) => (
               <PricingCard
                 key={p.name}
@@ -657,32 +657,32 @@ export default function Home() {
       <section style={{ padding:"60px 24px 80px", position:"relative", zIndex:1 }}>
         <div style={{ maxWidth:600, margin:"0 auto", textAlign:"center" }}>
           <div style={{
-            background:"linear-gradient(135deg, #34D39910, #818CF810)",
-            border:"1px solid #34D39930", borderRadius:24, padding:"48px 32px",
+            background:"linear-gradient(135deg, #ffedd710, #6c5f5110)",
+            border:"1px solid #ffedd730", borderRadius:24, padding:"48px 32px",
             position:"relative", overflow:"hidden",
           }}>
-            <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"#34D39920", filter:"blur(60px)" }} />
-            <div style={{ position:"absolute", bottom:-40, left:-40, width:160, height:160, borderRadius:"50%", background:"#818CF820", filter:"blur(50px)" }} />
+            <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"#ffedd720", filter:"blur(60px)" }} />
+            <div style={{ position:"absolute", bottom:-40, left:-40, width:160, height:160, borderRadius:"50%", background:"#6c5f5120", filter:"blur(50px)" }} />
             <div style={{ position:"relative" }}>
               <div style={{
                 width:64, height:64, borderRadius:18, margin:"0 auto 20px",
                 background:"rgba(52,211,153,0.12)", border:"1px solid rgba(52,211,153,0.3)",
                 display:"flex", alignItems:"center", justifyContent:"center",
               }} className="float">
-                <Rocket size={28} color="#34D399" />
+                <Rocket size={28} color="#ffedd7" />
               </div>
               <h2 style={{ fontSize:26, fontWeight:900, marginBottom:12 }}>
                 {t("home.cta_title")}
               </h2>
-              <p style={{ color:"#888", marginBottom:28, lineHeight:1.7 }}>
+              <p style={{ color:"#6c5f51", marginBottom:28, lineHeight:1.7 }}>
                 {t("home.cta_desc")}
               </p>
               <Link to="/auth?mode=register" style={{
                 display:"inline-flex", alignItems:"center", gap:10,
-                background:"#34D399", color:"#000",
+                background:"#ffedd7", color:"#100904",
                 padding:"14px 32px", borderRadius:12,
                 fontWeight:900, fontSize:16, textDecoration:"none",
-                boxShadow:"0 0 40px #34D39940",
+                boxShadow:"none",
               }}>
                 {t("home.cta_button")}
               </Link>
@@ -692,11 +692,11 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer style={{ borderTop:"1px solid #1e1e30", padding:"24px 20px", textAlign:"center", position:"relative", zIndex:1 }}>
-        <div style={{ fontSize:22, fontWeight:900, background:"linear-gradient(90deg, #34D399, #818CF8)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:6 }}>
+      <footer style={{ borderTop:"1px solid #40372e", padding:"24px 20px", textAlign:"center", position:"relative", zIndex:1 }}>
+        <div style={{ fontSize:22, fontWeight:900, background:"linear-gradient(90deg, #ffedd7, #6c5f51)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:6 }}>
           سوى
         </div>
-        <div style={{ fontSize:12, color:"#444" }}>{t("home.footer_made")}</div>
+        <div style={{ fontSize:12, color:"#5b4b3c" }}>{t("home.footer_made")}</div>
       </footer>
     </div>
   );

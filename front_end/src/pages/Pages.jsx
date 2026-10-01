@@ -42,7 +42,7 @@ export function WatchPage() {
   const [sharePassword, setSharePassword] = useState("");
   const [shareExpiry, setShareExpiry] = useState("");
   const [settingsMsg, setSettingsMsg] = useState("");
-  
+
   const { user } = useAuth();
 
   const fetchVideo = () => {
@@ -139,7 +139,7 @@ export function SharePage() {
   const [video,  setVideo]   = useState(null);
   const [error,  setError]   = useState("");
   const [loading,setLoading] = useState(true);
-  
+
   // Feature 4: Password state
   const [needsPassword, setNeedsPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -153,7 +153,7 @@ export function SharePage() {
       // إذا كان لدينا توكن مؤقت، سنحتاج لتمريره (client.js سيحتاج لتعديل طفيف، أو نضعه في هيدر)
       // للتبسيط: API_BASE/videos/share/{token} تقبل Header
       const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-      
+
       const res = await fetch(`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL+'/api' : '/api'}/videos/share/${token}`, { headers });
       if (!res.ok) {
         const err = await res.json().catch(()=>({}));
@@ -210,11 +210,11 @@ export function SharePage() {
       </div>
       <h2 style={{ marginBottom: 12 }}>{t("pages.share_password_title")}</h2>
       <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 14 }}>{t("pages.share_password_desc")}</p>
-      
+
       <form onSubmit={handleUnlock}>
-        <input 
-          type="password" 
-          placeholder={t("pages.share_password_placeholder")} 
+        <input
+          type="password"
+          placeholder={t("pages.share_password_placeholder")}
           value={password}
           onChange={e => setPassword(e.target.value)}
           style={{ marginBottom: 16, textAlign: "center" }}
@@ -231,7 +231,7 @@ export function SharePage() {
   if (error) return (
     <div style={{ textAlign: "center", padding: "80px 20px" }}>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-        <AlertTriangle size={40} color="#FCD34D" />
+        <AlertTriangle size={40} color="#ffedd7" />
       </div>
       <h2>{t("pages.share_not_available")}</h2>
       <p style={{ color: "var(--text-muted)" }}>{error}</p>
@@ -247,7 +247,7 @@ export function SharePage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
       {/* شعار صغير */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <Link to="/" style={{ textDecoration: "none", fontSize: 20, fontWeight: 900, background: "linear-gradient(135deg, #34D399, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        <Link to="/" style={{ textDecoration: "none", fontSize: 20, fontWeight: 900, background: "linear-gradient(135deg, #ffedd7, #6c5f51)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           {t("app_name")}
         </Link>
         <Link to="/auth" className="btn btn-primary" style={{ fontSize: 12, padding: "6px 14px" }}>

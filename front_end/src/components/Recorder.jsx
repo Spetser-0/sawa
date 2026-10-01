@@ -474,7 +474,7 @@ export default function Recorder({ onUploadDone }) {
     <div style={{ maxWidth: 600, margin: "0 auto" }}>
 
       {(state === "recording" || state === "paused") && (
-        <div style={{ position: "relative", marginBottom: 16, borderRadius: 14, overflow: "hidden", background: "#000", border: "2px solid #34D399" }}>
+        <div style={{ position: "relative", marginBottom: 16, borderRadius: 14, overflow: "hidden", background: "#100904", border: "2px solid #ffedd7" }}>
           <video
             ref={previewRef}
             muted
@@ -482,13 +482,13 @@ export default function Recorder({ onUploadDone }) {
             playsInline
             style={{ width: "100%", maxHeight: 300, display: "block", objectFit: "cover" }}
           />
-          <div style={{ position: "absolute", top: 12, right: 12, display: "flex", gap: 8, alignItems: "center", background: "#000000aa", borderRadius: 20, padding: "4px 12px" }}>
+          <div style={{ position: "absolute", top: 12, right: 12, display: "flex", gap: 8, alignItems: "center", background: "#100904aa", borderRadius: 20, padding: "4px 12px" }}>
             <div style={{
               width: 10, height: 10, borderRadius: "50%",
-              background: state === "recording" ? "#F87171" : "#FCD34D",
+              background: state === "recording" ? "#dc5000" : "#ffedd7",
               animation: state === "recording" ? "pulse-ring 1s infinite" : "none",
             }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#ffedd7" }}>
               {state === "recording" ? t("recorder.recording") : t("recorder.paused")} — {formatTime(duration)}
             </span>
           </div>
@@ -498,13 +498,13 @@ export default function Recorder({ onUploadDone }) {
       {state === "idle" && (
         <div className="card fade-in" style={{ marginBottom: 16 }}>
           {isMobile && (
-            <div style={{ padding: "12px 16px", background: "#818CF815", border: "1px solid #818CF833", borderRadius: 10, fontSize: 13, color: "#818CF8", marginBottom: 16, textAlign: "center" }}>
+            <div style={{ padding: "12px 16px", background: "#6c5f5115", border: "1px solid #6c5f5133", borderRadius: 10, fontSize: 13, color: "#6c5f51", marginBottom: 16, textAlign: "center" }}>
               {t("recorder.mobile_notice")}
             </div>
           )}
 
           {state === "idle" && mode === "camera" && (
-            <div style={{ position: "relative", marginBottom: 16, borderRadius: 14, overflow: "hidden", background: "#000" }}>
+            <div style={{ position: "relative", marginBottom: 16, borderRadius: 14, overflow: "hidden", background: "#100904" }}>
               <video
                 ref={previewRef}
                 muted
@@ -520,8 +520,8 @@ export default function Recorder({ onUploadDone }) {
                   style={{
                     position: "absolute", bottom: 10, right: 10,
                     width: 40, height: 40, borderRadius: "50%",
-                    background: "#000000aa", border: "none",
-                    color: "#fff", cursor: "pointer",
+                    background: "#100904aa", border: "none",
+                    color: "#ffedd7", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
@@ -552,7 +552,7 @@ export default function Recorder({ onUploadDone }) {
               })}
             </div>
           {!supportsDisplayMedia && mode === "screen" && (
-            <div style={{ padding: "10px 14px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 13, color: "#F87171", marginBottom: 16, textAlign: "center" }}>
+            <div style={{ padding: "10px 14px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 10, fontSize: 13, color: "#dc5000", marginBottom: 16, textAlign: "center" }}>
               {t("recorder.screen_not_supported", "Screen recording isn't supported in this browser")}
             </div>
           )}
@@ -655,7 +655,7 @@ export default function Recorder({ onUploadDone }) {
                 <button
                   className="btn btn-outline"
                   onClick={handleGoogleDriveImport}
-                  style={{ flex: 1, justifyContent: "center", borderColor: "#818CF833", color: "#818CF8" }}
+                  style={{ flex: 1, justifyContent: "center", borderColor: "#6c5f5133", color: "#6c5f51" }}
                 >
                   <Cloud size={15} /> Google Drive
                 </button>
@@ -692,7 +692,7 @@ export default function Recorder({ onUploadDone }) {
             {noiseReduction ? t("recorder.uploading_denoising") : t("recorder.uploading")}
           </div>
           <div style={{ background: "var(--border)", borderRadius: 4, height: 8, overflow: "hidden" }}>
-            <div style={{ width: `${progress}%`, height: "100%", background: "linear-gradient(90deg, #34D39966, #34D399)", borderRadius: 4, transition: "width 0.3s" }} />
+            <div style={{ width: `${progress}%`, height: "100%", background: "linear-gradient(90deg, #ffedd766, #ffedd7)", borderRadius: 4, transition: "width 0.3s" }} />
           </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{progress}%</div>
           {noiseReduction && (
@@ -704,7 +704,7 @@ export default function Recorder({ onUploadDone }) {
       )}
 
       {state === "done" && (
-        <div className="card fade-in" style={{ textAlign: "center", marginTop: 16, border: "1px solid #34D39944" }}>
+        <div className="card fade-in" style={{ textAlign: "center", marginTop: 16, border: "1px solid #ffedd744" }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
             <CheckCircle2 size={32} color="var(--green)" />
           </div>
@@ -724,7 +724,7 @@ export default function Recorder({ onUploadDone }) {
       )}
 
       {error && (
-        <div style={{ marginTop: 12, padding: "12px 16px", background: "#F8717115", border: "1px solid #F8717133", borderRadius: 10, fontSize: 13, color: "#F87171", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ marginTop: 12, padding: "12px 16px", background: "#dc500015", border: "1px solid #dc500033", borderRadius: 10, fontSize: 13, color: "#dc5000", display: "flex", alignItems: "center", gap: 8 }}>
           <AlertCircle size={16} style={{ flexShrink: 0 }} />
           {error}
         </div>

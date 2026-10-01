@@ -114,9 +114,9 @@ export default function Analytics({ videoId, onClose }) {
           <>
             {/* بطاقات الأرقام */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
-              <MetricCard icon={<Eye size={20} color="#34D399" />} label={t("analytics.total_views")} value={data.total_views.toLocaleString("ar")} color="#34D399" />
-              <MetricCard icon={<Users size={20} color="#818CF8" />} label={t("analytics.unique_viewers")} value={data.unique_viewers.toLocaleString("ar")} color="#818CF8" />
-              <MetricCard icon={<Clock size={20} color="#F59E0B" />} label={t("analytics.avg_watch_duration")} value={fmtDur(data.avg_watch_duration, t)} color="#F59E0B" />
+              <MetricCard icon={<Eye size={20} color="#ffedd7" />} label={t("analytics.total_views")} value={data.total_views.toLocaleString("ar")} color="#ffedd7" />
+              <MetricCard icon={<Users size={20} color="#6c5f51" />} label={t("analytics.unique_viewers")} value={data.unique_viewers.toLocaleString("ar")} color="#6c5f51" />
+              <MetricCard icon={<Clock size={20} color="#dc5000" />} label={t("analytics.avg_watch_duration")} value={fmtDur(data.avg_watch_duration, t)} color="#dc5000" />
             </div>
 
             {/* مخطط الاحتفاظ */}
@@ -128,29 +128,29 @@ export default function Analytics({ videoId, onClose }) {
                 <div style={{ background: "var(--bg)", borderRadius: 12, padding: "16px 8px", border: "1px solid var(--border)" }}>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={fmtRetention}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1e30" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#40372e" />
                       <XAxis
                         dataKey="label"
-                        tick={{ fill: "#6b7280", fontSize: 11 }}
-                        axisLine={{ stroke: "#1e1e30" }}
+                        tick={{ fill: "#6c5f51", fontSize: 11 }}
+                        axisLine={{ stroke: "#40372e" }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: "#6b7280", fontSize: 11 }}
-                        axisLine={{ stroke: "#1e1e30" }}
+                        tick={{ fill: "#6c5f51", fontSize: 11 }}
+                        axisLine={{ stroke: "#40372e" }}
                         tickLine={false}
                         width={30}
                       />
                       <Tooltip
-                        contentStyle={{ background: "#0d0d1a", border: "1px solid #1e1e30", borderRadius: 8, fontSize: 12 }}
-                        labelStyle={{ color: "#34D399" }}
+                        contentStyle={{ background: "#382416", border: "1px solid #40372e", borderRadius: 8, fontSize: 12 }}
+                        labelStyle={{ color: "#ffedd7" }}
                         itemStyle={{ color: "#e0e0ec" }}
                         formatter={(val) => [val, t("analytics.viewers_tooltip")]}
                       />
                       <Line
                         type="monotone" dataKey="viewers"
-                        stroke="#34D399" strokeWidth={2}
-                        dot={false} activeDot={{ r: 4, fill: "#34D399" }}
+                        stroke="#ffedd7" strokeWidth={2}
+                        dot={false} activeDot={{ r: 4, fill: "#ffedd7" }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -167,19 +167,19 @@ export default function Analytics({ videoId, onClose }) {
                 <div style={{ background: "var(--bg)", borderRadius: 12, padding: "16px 8px", border: "1px solid var(--border)" }}>
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={fmtCountries} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1e30" horizontal={false} />
-                      <XAxis type="number" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#40372e" horizontal={false} />
+                      <XAxis type="number" tick={{ fill: "#6c5f51", fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis
                         type="category" dataKey="name" width={70}
                         tick={{ fill: "#e0e0ec", fontSize: 12 }} axisLine={false} tickLine={false}
                       />
                       <Tooltip
-                        contentStyle={{ background: "#0d0d1a", border: "1px solid #1e1e30", borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ background: "#382416", border: "1px solid #40372e", borderRadius: 8, fontSize: 12 }}
                         formatter={(val) => [val, t("analytics.view_tooltip")]}
                       />
                       <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                         {fmtCountries.map((_, i) => (
-                          <Cell key={i} fill={["#34D399","#818CF8","#F59E0B","#F472B6","#60A5FA","#C084FC","#34D399","#818CF8"][i % 8]} />
+                          <Cell key={i} fill={["#ffedd7","#6c5f51","#dc5000","#dc5000","#ffedd7","#6c5f51","#ffedd7","#6c5f51"][i % 8]} />
                         ))}
                       </Bar>
                     </BarChart>

@@ -16,7 +16,7 @@ function getStrength(pwd) {
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
   return score;
 }
-const STRENGTH_COLORS = ["#F87171", "#F87171", "#FCD34D", "#34D399", "#34D399"];
+const STRENGTH_COLORS = ["#dc5000", "#dc5000", "#ffedd7", "#ffedd7", "#ffedd7"];
 
 export default function Settings() {
   const { user, logout, refresh } = useAuth();
@@ -121,8 +121,8 @@ export default function Settings() {
         {nameMsg.text && (
           <div style={{
             padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 12,
-            background: nameMsg.type === "success" ? "#34D39915" : "#F8717115",
-            border: `1px solid ${nameMsg.type === "success" ? "#34D39933" : "#F8717133"}`,
+            background: nameMsg.type === "success" ? "#ffedd715" : "#dc500015",
+            border: `1px solid ${nameMsg.type === "success" ? "#ffedd733" : "#dc500033"}`,
             color: nameMsg.type === "success" ? "var(--green)" : "var(--red)",
             display: "flex", alignItems: "center", gap: 8,
           }}>
@@ -184,8 +184,8 @@ export default function Settings() {
           {pwdMsg.text && (
             <div style={{
               padding: "10px 14px", borderRadius: 8, fontSize: 13,
-              background: pwdMsg.type === "success" ? "#34D39915" : "#F8717115",
-              border: `1px solid ${pwdMsg.type === "success" ? "#34D39933" : "#F8717133"}`,
+              background: pwdMsg.type === "success" ? "#ffedd715" : "#dc500015",
+              border: `1px solid ${pwdMsg.type === "success" ? "#ffedd733" : "#dc500033"}`,
               color: pwdMsg.type === "success" ? "var(--green)" : "var(--red)",
               display: "flex", alignItems: "center", gap: 8,
             }}>
