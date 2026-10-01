@@ -285,6 +285,8 @@ export const aiAPI = {
       "POST",
       `/transcripts/${videoId}/diarize${n ? `?num_speakers=${n}` : ""}`,
     ),
+  getDiarizeStatus: (videoId) =>
+    request("GET", `/transcripts/${videoId}/diarize/status`),
   exportUrl: (videoId, fmt) =>
     `${API_BASE}/transcripts/${videoId}/export?fmt=${fmt}`,
   generateChapters: (videoId) =>

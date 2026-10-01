@@ -1,7 +1,7 @@
 /**
  * مشغّل الفيديو مع النص المفرَّغ + الميزات الذكية + التعليقات + HLS
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { transcriptAPI, aiAPI, commentsAPI, analyticsAPI, videosAPI } from "../api/client";
 import AIFeatures from "./AIFeatures";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import { useAuth } from "../hooks/useAuth";
 import {
   Eye, Clock, Calendar, Link2, Sparkles, ChevronUp, ChevronDown,
   Trash2, Check, Copy, Pencil, Loader2, AlertCircle, RotateCcw,
+  Edit, User, Flag, HelpCircle, Volume2,
 } from "lucide-react";
 import { useToast } from "./ui/Toast";
 
@@ -25,10 +26,27 @@ const speakerColor = (name) => {
 
 const fmtTime = (s) => `${Math.floor(s/60).toString().padStart(2,"0")}:${Math.floor(s%60).toString().padStart(2,"0")}`;
 
+// Status mapping for display
+const STATUS_LABELS = {
+  pending: "player.pending",
+  queued: "player.queued",
+  normalizing: "player.normalizing",
+  vad: "player.vad",
+  transcribing: "player.transcribing",
+  aligning: "player.aligning",
+  diarizing: "player.diarizing",
+  merging: "player.merging",
+  processing: "player.processing",
+  done: "player.done",
+  failed: "player.failed",
+};
+
 export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken = null }) {
   const toast = useToast();
   const [transcript,   setTranscript]   = useState(null);
   const [status,       setStatus]       = useState("loading");
+  const [progress,     setProgress]     = useState(0);
+  const [currentStage, setCurrentStage] = useState("");
   const [currentTime,  setCurrentTime]  = useState(0);
   const [duration,     setDuration]     = useState(video?.duration || 0);
   const [activeIdx,    setActiveIdx]    = useState(-1);
@@ -37,6 +55,8 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
   const [copied,       setCopied]       = useState(false);
   const [showAI,       setShowAI]       = useState(false);
   const [isHlsLoaded,  setIsHlsLoaded]  = useState(false);
+  const [speakerNames, setSpeakerNames] = useState({}); // Custom speaker names
+  const [showReview,   setShowReview]   = useState(false); // Show review mode for ambiguous speakers
 
   // ── Feature 2: Smart Chapters ──
   const [chapters, setChapters] = useState([]);
@@ -101,18 +121,25 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
 
 
   // ── جلب البيانات (تفريغ، فصول، تعليقات) ──
-  const fetchTranscript = async () => {
+  const fetchTranscript = useCallback(async () => {
     if (!video) return;
     try {
       const data = await transcriptAPI.get(video.id);
       setTranscript(data);
       setStatus(data.status);
+      setProgress(data.progress_percent || 0);
+      setCurrentStage(data.current_stage || "");
       if (data.full_text) setEditText(data.full_text);
-      if (data.status === "pending" || data.status === "processing") {
-        pollRef.current = setTimeout(fetchTranscript, 4000);
+      
+      // Poll for incomplete statuses
+      const pollingStatuses = ["pending", "queued", "normalizing", "vad", "transcribing", "aligning", "diarizing", "merging", "processing"];
+      if (pollingStatuses.includes(data.status)) {
+        // Adaptive polling: faster for active stages, slower for queued
+        const delay = data.status === "queued" ? 5000 : 3000;
+        pollRef.current = setTimeout(fetchTranscript, delay);
       }
     } catch { setStatus("error"); }
-  };
+  }, [video]);
 
   const fetchChapters = async () => {
     if (!video) return;
@@ -135,7 +162,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
     fetchChapters();
     fetchComments();
     return () => clearTimeout(pollRef.current);
-  }, [video?.id]);
+  }, [video?.id, fetchTranscript]);
 
 
   // ── مزامنة النص والتوقيت ──
@@ -177,6 +204,112 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
       setTranscript((t) => ({ ...t, full_text: editText }));
       setIsEditing(false);
     } catch (e) { toast.error(t("player.save_failed") + e.message); }
+  };
+
+  // Progress stage labels
+  const STAGE_LABELS = {
+    queued: "player.stage_queued",
+    normalizing: "player.stage_normalizing",
+    vad: "player.stage_vad",
+    transcribing: "player.stage_transcribing",
+    aligning: "player.stage_aligning",
+    diarizing: "player.stage_diarizing",
+    merging: "player.stage_merging",
+    processing: "player.stage_processing",
+  };
+
+  // Helper to get display name for speaker
+  const getSpeakerDisplayName = (speaker) => {
+    if (!speaker) return "";
+    return speakerNames[speaker] || speaker;
+  };
+
+  // Helper to check if segment is ambiguous
+  const isAmbiguous = (seg) => seg.flags && seg.flags.includes("ambiguous_speaker");
+
+  // Helper to check if segment has overlapping speech
+  const hasOverlappingSpeech = (seg) => seg.flags && seg.flags.includes("overlapping_speech");
+
+  // Handle speaker rename
+  const handleSpeakerRename = (oldName, newName) => {
+    if (!newName.trim()) return;
+    setSpeakerNames(prev => ({ ...prev, [oldName]: newName.trim() }));
+  };
+
+  // Render speaker badge with edit capability
+  const renderSpeakerBadge = (speaker, idx) => {
+    if (!speaker) return null;
+    const displayName = getSpeakerDisplayName(speaker);
+    const isAmbiguousSegment = transcript?.segments[idx]?.flags?.includes("ambiguous_speaker");
+    const hasOverlap = transcript?.segments[idx]?.flags?.includes("overlapping_speech");
+    const color = speakerColor(speaker);
+
+    return (
+      <div style={{ 
+        display: "flex", 
+        alignItems: "center", 
+        gap: 4, 
+        marginBottom: 4,
+        padding: "4px 8px",
+        background: "var(--bg)",
+        borderRadius: 6,
+        border: `1px solid ${color}40`,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color }}>{displayName}</span>
+        <button
+          onClick={() => {
+            const newName = prompt(t("player.rename_speaker", { name: displayName }), displayName);
+            if (newName) handleSpeakerRename(speaker, newName);
+          }}
+          style={{
+            padding: "2px 6px",
+            fontSize: 10,
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: 4,
+            cursor: "pointer",
+            color: "var(--text-muted)",
+          }}
+          title={t("player.rename_speaker_title")}
+        >
+          <Edit size={10} />
+        </button>
+        {isAmbiguousSegment && (
+          <span 
+            style={{ 
+              fontSize: 9, 
+              padding: "1px 4px", 
+              background: "#F59E0B20", 
+              color: "#F59E0B", 
+              borderRadius: 3,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+            title={t("player.ambiguous_speaker_tooltip")}
+          >
+            <HelpCircle size={8} /> {t("player.ambiguous_speaker")}
+          </span>
+        )}
+        {hasOverlap && (
+          <span 
+            style={{ 
+              fontSize: 9, 
+              padding: "1px 4px", 
+              background: "#F472B620", 
+              color: "#F472B6", 
+              borderRadius: 3,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+            title={t("player.overlapping_speech_tooltip")}
+          >
+            <Volume2 size={8} /> {t("player.overlapping_speech")}
+          </span>
+        )}
+      </div>
+    );
   };
 
   // Feature 2
@@ -408,10 +541,22 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
         </div>
 
         {/* حالات التفريغ */}
-        {(status === "pending" || status === "processing") && (
+        {["pending", "queued", "normalizing", "vad", "transcribing", "aligning", "diarizing", "merging", "processing"].includes(status) && (
           <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
             <Loader2 size={28} color="var(--green)" className="spin" style={{ marginBottom:12 }} />
-            <div style={{ fontWeight:600, marginBottom:6 }}>{status === "pending" ? t("player.pending") : t("player.processing")}</div>
+            <div style={{ fontWeight:600, marginBottom:6 }}>
+              {t(STATUS_LABELS[status] || "player.processing")}
+            </div>
+            {currentStage && STAGE_LABELS[currentStage] && (
+              <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:12 }}>
+                {t(STAGE_LABELS[currentStage])}
+              </div>
+            )}
+            {progress > 0 && (
+              <div style={{ width: "100%", maxWidth: 200, height: 6, background: "var(--border)", borderRadius: 3, overflow: "hidden", marginBottom: 12 }}>
+                <div style={{ width: `${progress}%`, height: "100%", background: "var(--green)", borderRadius: 3, transition: "width 0.3s ease" }} />
+              </div>
+            )}
             <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:16 }}>{t("player.auto_appear")}</div>
             <div style={{ display:"flex", gap:4 }}>
               {[0,1,2].map(i => (
@@ -425,6 +570,11 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
           <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
             <AlertCircle size={28} color="var(--red)" style={{ marginBottom:8 }} />
             <div style={{ color:"var(--red)", marginBottom:12, fontSize:13 }}>{t("player.failed")}</div>
+            {transcript?.error_message && (
+              <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:12, textAlign:"center", maxWidth:300 }}>
+                {transcript.error_message}
+              </div>
+            )}
             <button className="btn btn-outline" style={{ fontSize:12 }}
               onClick={() => transcriptAPI.retry(video.id).then(fetchTranscript)}>
               <RotateCcw size={13} /> {t("player.retry")}
@@ -446,13 +596,14 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
               const spColor   = speakerColor(seg.speaker);
               const prevSpeaker = idx > 0 ? transcript.segments[idx-1].speaker : null;
               const showLabel = seg.speaker && seg.speaker !== prevSpeaker;
+              const displayName = getSpeakerDisplayName(seg.speaker);
 
               return (
                 <div key={idx} ref={(el) => segRefs.current[idx] = el}>
-                  {/* اسم المتحدث عند التغيير */}
+                  {/* Speaker badge on change */}
                   {showLabel && (
-                    <div style={{ padding:"8px 12px 2px", fontSize:11, fontWeight:700, color:spColor }}>
-                      {seg.speaker}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px 0", marginBottom: 4 }}>
+                      {renderSpeakerBadge(seg.speaker, idx)}
                     </div>
                   )}
                   <div onClick={() => seekTo(seg.start)}
@@ -468,6 +619,20 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
                     </span>
                     <span style={{ fontSize:13, color: isActive ? "var(--green)" : "var(--text)", fontWeight: isActive ? 600 : 400 }}>
                       {seg.text}
+                      {seg.words && seg.words.length > 0 && (
+                        <span style={{ display: "block", marginTop: 4, fontSize: 11, color: "var(--text-muted)", lineHeight: 1.6 }}>
+                          {seg.words.map((w, wi) => (
+                            <span key={wi} style={{ 
+                              background: isActive ? "#34D39930" : "transparent",
+                              padding: "1px 3px",
+                              borderRadius: 3,
+                              marginRight: 2,
+                            }}>
+                              {w.word}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -484,6 +649,7 @@ export default function VideoPlayer({ video, mediaUrl, startTime = 0, tempToken 
               {[
                 { fmt:"txt",  label:".txt",  color:"#34D399" },
                 { fmt:"srt",  label:".srt",  color:"#818CF8" },
+                { fmt:"vtt",  label:".vtt",  color:"#F59E0B" },
                 { fmt:"docx", label:".docx", color:"#60A5FA" },
                 { fmt:"json", label:".json", color:"#F59E0B" },
               ].map(({ fmt, label, color }) => (

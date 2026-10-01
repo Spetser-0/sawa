@@ -155,24 +155,92 @@ def diarize_audio(file_path: str, num_speakers: int = None) -> list:
         )
 
 
-def merge_diarization_with_transcript(segments: list, speakers: list) -> list:
+def merge_diarization_with_transcript(
+    segments: list,
+    speakers: list,
+    coverage_threshold: float = 0.5,
+) -> list:
     """
-    يدمج نتائج التفريغ مع تحديد المتحدثين
-    كل جملة تحصل على اسم المتحدث
+    يدمج نتائج التفريغ مع تحديد المتحدثين باستخدام تغطية التداخل (Interval Overlap Coverage).
+
+    For each transcript segment:
+    1. Calculate overlap duration with every diarization interval
+    2. Calculate coverage = overlap_duration / transcript_segment_duration
+    3. Select the highest-coverage speaker only if coverage >= threshold
+    4. Otherwise assign "متحدث غير معروف"
+    5. Add speaker_coverage and flags for ambiguous segments
+
+    Args:
+        segments: List of transcript segments with start/end/text
+        speakers: List of diarization intervals with start/end/speaker (raw labels)
+        coverage_threshold: Minimum coverage to assign a speaker (default 0.5)
+
+    Returns:
+        List of segments with speaker, speaker_coverage, and flags fields added
     """
     merged = []
+
     for seg in segments:
-        seg_mid = (seg["start"] + seg["end"]) / 2
+        seg_start = seg["start"]
+        seg_end = seg["end"]
+        seg_duration = seg_end - seg_start
 
-        # ابحث عن المتحدث في هذه اللحظة
-        speaker = "متحدث غير معروف"
+        if seg_duration <= 0:
+            # Invalid or zero-length segment
+            merged.append({
+                **seg,
+                "speaker": "متحدث غير معروف",
+                "speaker_coverage": 0.0,
+                "flags": ["invalid_segment"],
+            })
+            continue
+
+        best_speaker = None
+        best_coverage = 0.0
+        overlapping_speakers = []
+
         for sp in speakers:
-            if sp["start"] <= seg_mid <= sp["end"]:
-                # حوّل "SPEAKER_00" → "المتحدث 1"
-                num = int(sp["speaker"].split("_")[-1]) + 1
-                speaker = f"المتحدث {num}"
-                break
+            # Calculate overlap
+            overlap_start = max(seg_start, sp["start"])
+            overlap_end = min(seg_end, sp["end"])
+            overlap_duration = max(0.0, overlap_end - overlap_start)
 
-        merged.append({**seg, "speaker": speaker})
+            if overlap_duration > 0:
+                coverage = overlap_duration / seg_duration
+                overlapping_speakers.append({
+                    "speaker": sp["speaker"],
+                    "coverage": coverage,
+                    "overlap_duration": overlap_duration,
+                })
+
+                if coverage > best_coverage:
+                    best_coverage = coverage
+                    best_speaker = sp["speaker"]
+
+        # Determine speaker assignment
+        flags = []
+        if best_coverage >= coverage_threshold and best_speaker:
+            # Convert raw label (SPEAKER_00) to display name (المتحدث 1)
+            try:
+                num = int(best_speaker.split("_")[-1]) + 1
+                speaker_name = f"المتحدث {num}"
+            except (ValueError, IndexError):
+                speaker_name = best_speaker
+        else:
+            speaker_name = "متحدث غير معروف"
+            if best_coverage > 0:
+                flags.append("ambiguous_speaker")
+
+        # Check for multiple overlapping speakers with significant coverage
+        significant_overlaps = [s for s in overlapping_speakers if s["coverage"] >= 0.2]
+        if len(significant_overlaps) > 1:
+            flags.append("overlapping_speech")
+
+        merged.append({
+            **seg,
+            "speaker": speaker_name,
+            "speaker_coverage": round(best_coverage, 3),
+            "flags": flags,
+        })
 
     return merged

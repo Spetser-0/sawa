@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { aiAPI } from "../api/client";
-import { Globe, Sparkles, Users, AlertCircle } from "lucide-react";
+import { Globe, Sparkles, Users, AlertCircle, Loader2 } from "lucide-react";
 
 export default function AIFeatures({ videoId, transcriptDone }) {
   const { t } = useTranslation();
@@ -13,8 +13,40 @@ export default function AIFeatures({ videoId, transcriptDone }) {
   const [diarResult,  setDiarResult]  = useState(null);
   const [numSpeakers, setNumSpeakers] = useState("");
   const [copied,      setCopied]      = useState(false);
+  const [diarStatus,  setDiarStatus]  = useState(null);
+  const [pollInterval, setPollInterval] = useState(null);
 
   if (!transcriptDone) return null;
+
+  // Poll for diarization status
+  useEffect(() => {
+    if (diarStatus === "queued" || diarStatus === "diarizing") {
+      const interval = setInterval(async () => {
+        try {
+          const res = await aiAPI.getDiarizeStatus(videoId);
+          setDiarStatus(res.status);
+          if (res.status === "done" && res.segments) {
+            setDiarResult({
+              message: t("ai_features.diarization_completed"),
+              speakers_found: res.speakers_found,
+              segments: res.segments,
+            });
+            setDiarStatus("done");
+          } else if (res.status === "failed") {
+            setError(res.error_message || t("ai_features.diarization_failed"));
+            setDiarStatus("failed");
+          }
+        } catch (e) {
+          setError(e.message);
+          setDiarStatus("failed");
+        }
+      }, 3000);
+      setPollInterval(interval);
+    } else {
+      if (pollInterval) clearInterval(pollInterval);
+    }
+    return () => { if (pollInterval) clearInterval(pollInterval); };
+  }, [diarStatus, videoId]);
 
   const run = async (action) => {
     setLoading(true);
@@ -29,11 +61,16 @@ export default function AIFeatures({ videoId, transcriptDone }) {
         setSummary(r);
       } else if (action === "diarize") {
         const r = await aiAPI.diarize(videoId, numSpeakers ? parseInt(numSpeakers) : null);
-        setDiarResult(r);
+        if (r.status === "queued") {
+          setDiarStatus("queued");
+          setLoading(false);
+        } else if (r.segments) {
+          setDiarResult(r);
+          setLoading(false);
+        }
       }
     } catch (e) {
       setError(e.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -183,7 +220,7 @@ export default function AIFeatures({ videoId, transcriptDone }) {
       )}
 
       {/* ── واجهة تحديد المتحدثين ─────────────────── */}
-      {!loading && tab === "diarize" && !diarResult && (
+      {tab === "diarize" && !diarResult && (
         <div style={{ background: "#060610", border: "1px solid #C084FC33", borderRadius: 12, padding: 14 }}>
           <div style={{ fontSize: 12, color: "#C084FC", fontWeight: 700, marginBottom: 10 }}>{t("ai_features.diarization_title")}</div>
           <div style={{ fontSize: 12, color: "#888", marginBottom: 12, lineHeight: 1.6 }}>
@@ -208,6 +245,21 @@ export default function AIFeatures({ videoId, transcriptDone }) {
         </div>
       )}
 
+      {/* ── تقدم تحديد المتحدثين ─────────────────── */}
+      {tab === "diarize" && diarStatus && diarStatus !== "done" && diarStatus !== "failed" && (
+        <div style={{ background: "#060610", border: "1px solid #C084FC33", borderRadius: 12, padding: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Loader2 size={20} color="#C084FC" className="spin" />
+            <div style={{ fontSize: 12, color: "#C084FC", fontWeight: 700 }}>
+              {diarStatus === "queued" ? t("ai_features.diarizing_queued") : t("ai_features.diarizing_in_progress")}
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 10 }}>
+            {t("ai_features.diarization_progress_note")}
+          </div>
+        </div>
+      )}
+
       {/* ── نتيجة تحديد المتحدثين ─────────────────── */}
       {!loading && diarResult && tab === "diarize" && (
         <div style={{ background: "#060610", border: "1px solid #C084FC33", borderRadius: 12, padding: 14 }}>
@@ -217,6 +269,22 @@ export default function AIFeatures({ videoId, transcriptDone }) {
           <div style={{ fontSize: 11, color: "#555" }}>
             {t("ai_features.diarization_update_note")}
           </div>
+        </div>
+      )}
+
+      {/* ── خطأ في تحديد المتحدثين ─────────────────── */}
+      {diarStatus === "failed" && tab === "diarize" && (
+        <div style={{ background: "#F8717115", border: "1px solid #F8717133", borderRadius: 12, padding: 14 }}>
+          <div style={{ fontSize: 12, color: "#F87171", fontWeight: 700, marginBottom: 8 }}>
+            {t("ai_features.diarization_failed")}
+          </div>
+          {error && <div style={{ fontSize: 11, color: "#F87171" }}>{error}</div>}
+          <button 
+            onClick={() => { setDiarStatus(null); setError(""); run("diarize"); }}
+            style={{ marginTop: 10, width: "100%", padding: "8px", background: "#C084FC", border: "none", borderRadius: 8, color: "#000", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            {t("ai_features.retry_diarization")}
+          </button>
         </div>
       )}
     </div>

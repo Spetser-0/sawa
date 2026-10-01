@@ -272,6 +272,7 @@ async def upload_video(
                 r2_key=r2_key,
                 language=dialect,
                 noise_reduction=noise_reduction,
+                dialect_hint=dialect,
             ),
             dispatch(
                 hls_task,
@@ -449,6 +450,7 @@ def complete_upload(
             file_path=video.file_path,
             r2_key=video.file_path,
             language=video.dialect,
+            dialect_hint=video.dialect,
         ),
         dispatch(
             hls_task,

@@ -37,11 +37,18 @@ def get_db():
 #  ENUMS
 # ══════════════════════════════════════════════════════
 class TranscriptStatus(str, enum.Enum):
-    PENDING = "pending"     # في الانتظار
-    DENOISING = "denoising"   # جاري تنظيف الصوت
-    PROCESSING = "processing"  # قيد المعالجة
-    DONE = "done"        # اكتمل
-    FAILED = "failed"      # فشل
+    PENDING = "pending"        # في الانتظار
+    QUEUED = "queued"          # في الطابور
+    NORMALIZING = "normalizing"  # تطبيع الصوت
+    DENOISING = "denoising"    # جاري تنظيف الصوت
+    VAD = "vad"                # كشف النشاط الصوتي
+    TRANSCRIBING = "transcribing"  # تفريغ صوتي
+    ALIGNING = "aligning"      # محاذاة الكلمات
+    DIARIZING = "diarizing"    # تحديد المتحدثين
+    MERGING = "merging"        # دمج النتائج
+    PROCESSING = "processing"  # قيد المعالجة (legacy)
+    DONE = "done"              # اكتمل
+    FAILED = "failed"          # فشل
 
 
 class UserPlan(str, enum.Enum):
@@ -155,7 +162,22 @@ class Transcript(Base):
     # ── الحالة ───────────────────────────────────────
     status = Column(String, default=TranscriptStatus.PENDING)
     error_message = Column(Text, nullable=True)
+    error_code = Column(String, nullable=True)          # رمز خطأ موحد
     language_detected = Column(String, nullable=True)   # ما اكتشفه Whisper
+
+    # ── بيانات تعريفية للمراقبة ─────────────────────────
+    provider = Column(String, nullable=True)            # المزود المستخدم
+    model = Column(String, nullable=True)               # النموذج المستخدم
+    timestamp_source = Column(String, nullable=True)    # مصدر الطوابع الزمنية
+    progress_percent = Column(Integer, default=0)       # نسبة التقدم 0-100
+    current_stage = Column(String, nullable=True)       # المرحلة الحالية
+    retry_count = Column(Integer, default=0)            # عدد محاولات إعادة المحاولة
+
+    # ── اللهجة والمصطلحات ──────────────────────────────
+    dialect_selected = Column(String, nullable=True)    # اللهجة المختارة من المستخدم
+    language_detected = Column(String, nullable=True)   # اللغة المكتشفة (من الموفر)
+    terminology_applied = Column(Boolean, default=False) # هل تم تطبيق تصحيحات المصطلحات
+    terminology_dictionary_used = Column(Text, nullable=True) # القاموس المستخدم (JSON)
 
     # ── التوقيت ──────────────────────────────────────
     processing_time = Column(Float, nullable=True)      # ثواني استغرق التفريغ
@@ -168,6 +190,23 @@ class Transcript(Base):
 
     def __repr__(self):
         return f"<Transcript video={self.video_id[:8]} status={self.status}>"
+
+
+class TerminologyDictionary(Base):
+    __tablename__ = "terminology_dictionaries"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)  # اسم القاموس (مثال: "مصطلحات طبية")
+    entries_json = Column(Text, nullable=False)  # JSON array of {original, corrected}
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<TerminologyDictionary {self.name} user={self.user_id[:8]}>"
 
 
 class Comment(Base):

@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import settings
+from app.transcript_schema import (
+    CanonicalTranscript,
+    normalize_provider_output,
+    TimestampSource,
+)
+from app.alignment import align_transcript
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════
 #  Gemini (المزود الرئيسي — يدعم العربية بشكل ممتاز)
 # ══════════════════════════════════════════════════════
-def transcribe_with_gemini(file_path: str, language: str = "ar") -> dict:
+def transcribe_with_gemini(file_path: str, language: str = "ar", dialect_hint: Optional[str] = None) -> dict:
     """
     يفرّغ الملف الصوتي باستخدام Gemini 1.5 Flash.
     يدعم العربية ومختلف اللغات واللهجات.
@@ -31,7 +37,7 @@ def transcribe_with_gemini(file_path: str, language: str = "ar") -> dict:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
 
-    logger.info(f"🎙️ [Gemini] بدء تفريغ: {file_path} (language={language})")
+    logger.info(f"🎙️ [Gemini] بدء تفريغ: {file_path} (language={language}, dialect={dialect_hint})")
 
     # اقرأ الملف كبيانات خام
     file_ext = Path(file_path).suffix.lower()
@@ -83,6 +89,20 @@ def transcribe_with_gemini(file_path: str, language: str = "ar") -> dict:
     else:
         prompt_lang = "the audio's language"
 
+    # Add dialect hint to prompt if provided
+    dialect_instruction = ""
+    if dialect_hint and dialect_hint != "auto":
+        dialect_map = {
+            "ar": "Modern Standard Arabic (فصحى)",
+            "ar-EG": "Egyptian Arabic (مصري)",
+            "ar-AE": "Gulf Arabic (خليجي)",
+            "ar-SY": "Levantine Arabic (شامي)",
+            "ar-MA": "Maghrebi Arabic (مغاربي)",
+            "ar-LY": "Libyan Arabic (ليبي)",
+        }
+        dialect_name = dialect_map.get(dialect_hint, dialect_hint)
+        dialect_instruction = f"\n- The Arabic dialect is {dialect_name}"
+
     prompt = f"""You are an expert transcription assistant. Transcribe the attached audio file accurately.
 
 Return the result EXACTLY as this JSON (no extra text outside the JSON):
@@ -96,7 +116,7 @@ Return the result EXACTLY as this JSON (no extra text outside the JSON):
 }}
 
 Instructions:
-- The audio language is {prompt_lang}
+- The audio language is {prompt_lang}{dialect_instruction}
 - Preserve timestamps (start/end) in seconds accurately
 - Split text into short segments (3-10 seconds each)
 - Do not invent timestamps — use real timestamps from the audio
@@ -128,7 +148,8 @@ Instructions:
         result.setdefault("segments_count", len(result["segments"]))
 
         logger.info(f"✅ [Gemini] اكتمل التفريغ في {processing_time}s — {len(result['segments'])} مقطع")
-        return result
+        canonical = normalize_provider_output(result, "gemini", "gemini-1.5-flash")
+        return canonical.model_dump()
 
     except json.JSONDecodeError as e:
         logger.error(f"❌ [Gemini] فشل تحليل JSON: {e}")
@@ -141,7 +162,7 @@ Instructions:
 # ══════════════════════════════════════════════════════
 #  Groq (المزود البديل — سريع جداً)
 # ══════════════════════════════════════════════════════
-def transcribe_with_groq(file_path: str, language: str = "ar") -> dict:
+def transcribe_with_groq(file_path: str, language: str = "ar", dialect_hint: Optional[str] = None) -> dict:
     """
     يفرّغ الملف باستخدام Groq Whisper API.
     سريع جداً ويدعم عشرات اللغات.
@@ -154,7 +175,7 @@ def transcribe_with_groq(file_path: str, language: str = "ar") -> dict:
 
     client = Groq(api_key=api_key)
     base_lang = language.split("-")[0] if "-" in language else language
-    logger.info(f"🎙️ [Groq] بدء تفريغ: {file_path} (language={base_lang})")
+    logger.info(f"🎙️ [Groq] بدء تفريغ: {file_path} (language={base_lang}, dialect={dialect_hint})")
 
     start_time = time.time()
 
@@ -190,7 +211,72 @@ def transcribe_with_groq(file_path: str, language: str = "ar") -> dict:
     }
 
     logger.info(f"✅ [Groq] اكتمل التفريغ في {processing_time}s — {len(segments)} مقطع")
-    return output
+    canonical = normalize_provider_output(output, "groq", "whisper-large-v3-turbo")
+    return canonical.model_dump()
+
+
+# ══════════════════════════════════════════════════════
+#  تصحيح المصطلحات (Terminology Corrections)
+# ══════════════════════════════════════════════════════
+def apply_terminology_corrections(
+    canonical: CanonicalTranscript,
+    terminology_dict: dict,
+) -> CanonicalTranscript:
+    """
+    Apply terminology corrections to transcript segments.
+    
+    Args:
+        canonical: The canonical transcript to correct
+        terminology_dict: Dictionary mapping original terms to corrected terms
+                         e.g., {"old term": "new term", "another": "replacement"}
+    
+    Returns:
+        Updated CanonicalTranscript with corrections applied
+    """
+    if not terminology_dict:
+        return canonical
+    
+    # Create a copy of segments with corrections applied
+    corrected_segments = []
+    for seg in canonical.segments:
+        corrected_text = seg.text
+        for original, corrected in terminology_dict.items():
+            if original in corrected_text:
+                corrected_text = corrected_text.replace(original, corrected)
+        
+        corrected_segments.append(TranscriptSegment(
+            text=corrected_text,
+            start=seg.start,
+            end=seg.end,
+            speaker=seg.speaker,
+            words=seg.words,
+            confidence=seg.confidence,
+            flags=list(seg.flags) + (["terminology_corrected"] if corrected_text != seg.text else []),
+            timestamp_source=seg.timestamp_source,
+        ))
+    
+    # Also correct full_text
+    corrected_full_text = canonical.full_text
+    for original, corrected in terminology_dict.items():
+        if original in corrected_full_text:
+            corrected_full_text = corrected_full_text.replace(original, corrected)
+    
+    return CanonicalTranscript(
+        full_text=corrected_full_text,
+        segments=corrected_segments,
+        language_detected=canonical.language_detected,
+        provider=canonical.provider,
+        model=canonical.model,
+        processing_time=canonical.processing_time,
+        segments_count=len(corrected_segments),
+        metadata={
+            **canonical.metadata,
+            "terminology_applied": True,
+            "terminology_corrections_count": sum(
+                1 for seg in corrected_segments if "terminology_corrected" in seg.flags
+            ),
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════
@@ -200,6 +286,8 @@ def transcribe_audio(
     file_path: str,
     language: str = "ar",
     dialect_hint: Optional[str] = None,
+    run_alignment: bool = False,
+    terminology_dict: Optional[dict] = None,
 ) -> dict:
     """
     تفرّغ ملف صوتي أو فيديو — يجرّب المزودات بالترتيب:
@@ -229,20 +317,45 @@ def transcribe_audio(
         ]
 
     errors = []
+    canonical_result = None
     for name, func in providers:
         try:
             logger.info(f"🔄 محاولة التفريغ عبر: {name}")
-            result = func(file_path, language=language)
+            result = func(file_path, language=language, dialect_hint=dialect_hint)
             result["provider"] = name
-            return result
+            canonical_result = CanonicalTranscript(**result)
+            break
         except Exception as e:
             logger.warning(f"⚠️ فشل {name}: {e}")
             errors.append(f"{name}: {str(e)}")
             continue
 
-    raise RuntimeError(
-        f"فشلت جميع مزودات التفريغ:\n" + "\n".join(errors)
-    )
+    if canonical_result is None:
+        raise RuntimeError(
+            f"فشلت جميع مزودات التفريغ:\n" + "\n".join(errors)
+        )
+
+    # Apply terminology corrections if dictionary provided
+    terminology_applied = False
+    if terminology_dict:
+        canonical_result = apply_terminology_corrections(canonical_result, terminology_dict)
+        terminology_applied = True
+
+    # Store dialect info
+    canonical_result.metadata["dialect_selected"] = dialect_hint or "auto"
+    canonical_result.metadata["terminology_applied"] = terminology_applied
+
+    # Optional word-level alignment
+    if run_alignment and settings.ALIGNMENT_PROVIDER.lower() != "none":
+        logger.info(f"Running word-level alignment with provider: {settings.ALIGNMENT_PROVIDER}")
+        canonical_result = align_transcript(
+            audio_path=file_path,
+            canonical=canonical_result,
+            language=language,
+            provider_name=settings.ALIGNMENT_PROVIDER,
+        )
+
+    return canonical_result.model_dump()
 
 
 # ══════════════════════════════════════════════════════

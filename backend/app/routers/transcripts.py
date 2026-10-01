@@ -3,6 +3,7 @@
 """
 import json
 import io
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, PlainTextResponse, JSONResponse
@@ -12,6 +13,9 @@ from datetime import datetime
 
 from app.database import get_db, Transcript, Video, TranscriptStatus, User
 from app.auth import get_current_user, require_auth
+from app.storage import storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -210,41 +214,117 @@ def summarize_transcript_route(
 # ══════════════════════════════════════════════════════
 #  POST /api/transcripts/{video_id}/diarize  👥
 # ══════════════════════════════════════════════════════
-@router.post("/{video_id}/diarize")
+@router.post("/{video_id}/diarize", status_code=202)
 def diarize_transcript(
     video_id:         str,
-    background_tasks: BackgroundTasks,
     num_speakers:     Optional[int] = None,
     db:               Session       = Depends(get_db),
     current_user:     User          = Depends(require_auth),
 ):
-    """تحديد المتحدثين في التسجيل"""
+    """تحديد المتحدثين في التسجيل (غير متزامن — يعيد 202 فوراً)"""
     video = db.query(Video).filter(Video.id == video_id, Video.owner_id == current_user.id).first()
     if not video:
         raise HTTPException(404, "الفيديو غير موجود")
     transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
-    if not transcript or transcript.status != TranscriptStatus.DONE:
+    if not transcript:
+        raise HTTPException(404, "لا يوجد تفريغ")
+
+    # Idempotency guard: check if already diarizing
+    if transcript.status == TranscriptStatus.DIARIZING:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": "تحديد المتحدثين قيد المعالجة بالفعل",
+                "status": "diarizing",
+                "video_id": video_id,
+            },
+        )
+
+    # Check if already has speaker labels
+    segments = json.loads(transcript.segments_json or "[]")
+    if segments and any(s.get("speaker") and s["speaker"] != "متحدث غير معروف" for s in segments):
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": "المتحدثون محددون بالفعل لهذا التسجيل",
+                "status": "done",
+                "video_id": video_id,
+            },
+        )
+
+    # Only allow diarization if transcript is DONE
+    if transcript.status != TranscriptStatus.DONE:
         raise HTTPException(400, "التفريغ لم يكتمل بعد")
 
+    # Enqueue diarization task
+    from app.worker import diarize_task
+    r2_key = video.file_path if hasattr(storage(), "client") and hasattr(storage(), "bucket") else None
+    
     try:
-        from app.ai_services import diarize_audio, merge_diarization_with_transcript
-        segments = json.loads(transcript.segments_json or "[]")
+        dispatched = diarize_task.delay(
+            video_id=video_id,
+            file_path=video.file_path,
+            num_speakers=num_speakers,
+            r2_key=r2_key,
+        )
+    except Exception as e:
+        logger.error(f"Failed to dispatch diarize task: {e}")
+        raise HTTPException(503, "تعذر جدولة مهمة تحديد المتحدثين — طابور المعالجة غير متاح")
 
-        speakers = diarize_audio(video.file_path, num_speakers)
-        merged = merge_diarization_with_transcript(segments, speakers)
+    if not dispatched:
+        raise HTTPException(503, "تعذر جدولة مهمة تحديد المتحدثين — طابور المعالجة غير متاح")
 
-        transcript.segments_json = json.dumps(merged, ensure_ascii=False)
-        db.commit()
+    return {
+        "message": "تمت جدولة تحديد المتحدثين بنجاح",
+        "status": "queued",
+        "video_id": video_id,
+        "task_id": dispatched.id,
+    }
 
+
+# ═════════════════════════════════════════════════════
+#  GET /api/transcripts/{video_id}/diarize/status
+# ═════════════════════════════════════════════════════
+@router.get("/{video_id}/diarize/status")
+def get_diarize_status(
+    video_id:     str,
+    db:           Session       = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """جلب حالة مهمة تحديد المتحدثين"""
+    transcript = _get_transcript_or_404(video_id, db, current_user)
+    
+    # Determine status from transcript state
+    if transcript.status == TranscriptStatus.DIARIZING:
         return {
-            "message":         "تم تحديد المتحدثين بنجاح",
-            "speakers_found":  len(set(s["speaker"] for s in speakers)),
-            "segments":        merged,
+            "status": "diarizing",
+            "video_id": video_id,
         }
-    except (ImportError, ValueError):
-        raise HTTPException(400, "تحديد المتحدثين غير متاح حالياً")
-    except Exception:
-        raise HTTPException(500, "فشل تحديد المتحدثين")
+    
+    # Check if already has speaker labels
+    segments = json.loads(transcript.segments_json or "[]")
+    if segments and any(s.get("speaker") and s["speaker"] != "متحدث غير معروف" for s in segments):
+        speakers_found = len(set(s.get("speaker") for s in segments if s.get("speaker")))
+        return {
+            "status": "done",
+            "video_id": video_id,
+            "speakers_found": speakers_found,
+            "segments": segments,
+        }
+    
+    # Check for error state
+    if transcript.status == TranscriptStatus.FAILED:
+        return {
+            "status": "failed",
+            "video_id": video_id,
+            "error_message": transcript.error_message,
+        }
+    
+    # Default: queued or unknown
+    return {
+        "status": "queued",
+        "video_id": video_id,
+    }
 
 
 # ══════════════════════════════════════════════════════

@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     GROQ_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
 
+    # ── محاذاة الكلمات (Word-level Alignment) ──────────
+    ALIGNMENT_PROVIDER: str = "none"  # none | whisperx
+    ALIGNMENT_DEVICE: str = "cpu"     # cpu | cuda
+    ALIGNMENT_COMPUTE_TYPE: str = "int8"
+
+    # ── مصطلحات وتفريغ الصوت ──────────────────────────
+    # قاموس المصطلحات المشترك (JSON array of objects: {original: "term", corrected: "term"})
+    TERMINOLOGY_DICTIONARY: Optional[str] = None
+
     # ── البريد الإلكتروني ───────────────────────────
     MAIL_USERNAME: Optional[str] = None
     MAIL_PASSWORD: Optional[str] = None

@@ -28,3 +28,4 @@ celery
 redis
 anthropic
 python-magic
+whisperx
