@@ -42,13 +42,36 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expires_delta or timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode["exp"] = expire
+    to_encode.setdefault("type", "access")
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def create_refresh_token() -> str:
     """ينشئ توكن عشوائي آمن — القيمة الأصلية تُخزَّن في الكوكيز"""
     return secrets.token_urlsafe(64)
+
+
+def create_share_token(video_id: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a token limited to one shared video."""
+    payload = {
+        "sub": f"share:{video_id}",
+        "video_id": video_id,
+        "type": "share_access",
+    }
+    return create_access_token(payload, expires_delta or timedelta(hours=1))
+
+
+def verify_share_token(token: str, video_id: str) -> bool:
+    """Return True only for a valid share token bound to this video."""
+    payload = decode_token(token)
+    if not payload:
+        return False
+    return (
+        payload.get("type") == "share_access"
+        and payload.get("video_id") == video_id
+        and payload.get("sub") == f"share:{video_id}"
+    )
 
 
 def hash_token(token: str) -> str:
