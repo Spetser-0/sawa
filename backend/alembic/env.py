@@ -9,12 +9,12 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+from app.config import normalize_database_url
 from app.database import Base
 target_metadata = Base.metadata
 
 db_url = os.environ.get("DATABASE_URL", "sqlite:///./sawa.db")
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+db_url = normalize_database_url(db_url)
 config.set_main_option("sqlalchemy.url", db_url)
 
 

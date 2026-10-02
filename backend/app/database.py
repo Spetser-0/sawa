@@ -8,17 +8,18 @@ from datetime import datetime, timezone
 import enum
 import uuid
 
-from app.config import settings
+from app.config import normalize_database_url, settings
 
 def _utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # ── إعداد المحرك ─────────────────────────────────────
+DATABASE_URL = normalize_database_url(settings.DATABASE_URL)
 engine = create_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     # مطلوب لـ SQLite فقط
     connect_args={
-        "check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+        "check_same_thread": False} if "sqlite" in DATABASE_URL else {},
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

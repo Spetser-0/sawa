@@ -6,6 +6,15 @@ from pydantic import model_validator
 from typing import Optional
 
 
+def normalize_database_url(url: str) -> str:
+    """Normalize Render/PostgreSQL URLs to the psycopg 3 SQLAlchemy dialect."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
 class Settings(BaseSettings):
     # ── قاعدة البيانات ──────────────────────────────
     DATABASE_URL: str = "sqlite:///./sawa.db"

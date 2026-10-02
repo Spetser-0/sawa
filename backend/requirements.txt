@@ -11,7 +11,7 @@ numpy
 aiofiles
 python-docx
 httpx
-psycopg2-binary
+psycopg[binary]>=3.2,<4
 soundfile
 slowapi
 passlib[bcrypt]
